@@ -119,39 +119,6 @@ default_params = {
     'opt_pdf_sigma':        [0.28122634653850337, 0.25232918833346546, 
                              0.2468073941298409, 0.25273681573440887,
                              0.27245133519998282],
-    
-    # Guo (2010)
-    #'opt_bands':        ['u', 'g', 'r', 'i', 'z'],
-    #'opt_Amstar':       [1.2498e+04, 1.0426e+04, 7.2791e+03, 6.0470e+03, 
-    #                     2.5695e+04],
-    #'opt_Across':       [-4.1036e+00, -2.9742e+00, -2.2223e+00, -1.9305e+00, 
-    #                     -1.2898e+04],
-    #'opt_beta':         [-6.5246e-05, -8.4736e-05, -1.2782e-04, -1.5775e-04, 
-    #                     1.1491e-03],
-    #'opt_delta':        [-2.4003e-01, -2.5516e-01, -2.6497e-01, -2.6615e-01, 
-    #                     2.3634e-03],
-    #'opt_gamma':        [3.1723e-01, 3.1895e-01, 3.2399e-01, 3.2504e-01, 
-    #                     6.7098e-06],
-    #'opt_c':            [-1.2512e+04, -1.0443e+04, -7.2960e+03, -6.0642e+03,
-    #                     -1.2815e+04],
-    #'opt_sigma':        [2.7963e-01, 2.7666e-01, 2.4629e-01, 2.3056e-01,
-    #                     2.7222e-01],
-    # De Lucia (2006)
-    #'opt_bands':        ['B', 'V', 'R', 'I', 'K'], # De Lucia
-    #'opt_Amstar':       [-2.4227e+02, 2.5189e+03, 5.4991e+02, -7.0327e+03, 
-    #                     -9.7559e+03],
-    #'opt_Across':       [-3.1989e+00, -2.4842e+00, -2.0832e+00, -1.8321e+00, 
-    #                     -1.5064e+00],
-    #'opt_beta':         [3.8688e-03, -3.8545e-04, -1.8032e-03, 1.4392e-04, 
-    #                     1.0981e-04],
-    #'opt_delta':        [-2.4241e-01, -2.5447e-01, -2.5594e-01, -2.5203e-01, 
-    #                     -2.1210e-01],
-    #'opt_gamma':        [2.6720e-01, 2.6709e-01, 2.6306e-01, 2.5988e-01, 
-    #                     2.2515e-01],
-    #'opt_c':            [2.2667e+02, -2.5354e+03, -5.6709e+02, 7.0150e+03, 
-    #                     9.7367e+03],
-    #'opt_sigma':        [2.4427e-01, 2.2503e-01, 2.0935e-01, 1.9636e-01, 
-    #                     1.8812e-01],
 }
 
 
@@ -494,49 +461,6 @@ def luminosity_sfr(hm, z, params,
     
     return sfr, dndlogsfr_sfms, dndlogsfr_pass
 
-"""
-def optical_mag_old(sfr, mstar, band, z, params):
-    \"""
-    Return the predicted optical magnitude given the stellar mass and SFR. 
-    Calculated using an ansatz with best-fit parameters calibrated against 
-    the De Lucia catalogue.
-    \"""
-    # Figure out which band to use
-    if band in params['opt_bands']:
-        i = params['opt_bands'].index(band)
-    else:
-        raise KeyError("Band '%s' not recognised; available bands are: %s" % \
-                       (band, params['opt_bands']))
-    
-    # Ansatz, roughly taking into account 2 sources of stellar light: star 
-    # formation (SFR as proxy) and older stars (via stellar mass)
-    mag = params['opt_Amstar'][i] * (mstar/1e9)**params['opt_beta'][i] \
-        + params['opt_Across'][i] * (mstar/1e9)**params['opt_delta'][i] \
-          * (sfr)**params['opt_gamma'][i] + params['opt_c'][i]
-    return mag
-
-
-def pdf_optical_mag_old(mag, sfr, mstar, band, z, params):
-    \"""
-    Intrinsic optical magnitude pdf, conditioned on Mstar and SFR: 
-    p(mag_X | M_*, SFR, z). 
-    Assumed to be Gaussian with scatter measured from Guo et al. simulations.
-    \"""
-    # Figure out which band to use
-    if band in params['opt_bands']:
-        i = params['opt_bands'].index(band)
-    else:
-        raise KeyError("Band '%s' not recognised; available bands are: %s" % \
-                       (band, params['opt_bands']))
-    
-    # Mean and standard deviation
-    mu = optical_mag(sfr, mstar, band, z=z, params=params)
-    sigma = params['opt_sigma'][i]
-    
-    # Return Gaussian PDF
-    return np.exp(-(mag - mu)**2. / (2. * sigma**2.)) \
-           / (np.sqrt(2.*np.pi) * sigma)
-"""
 
 def tau_extinction(sintheta, mstar, band, z, params):
     """
@@ -682,37 +606,6 @@ def optical_mag_fn(hm, mag, band, z, params):
     # Return total function (dn/dmag) ~ Mpc^-3 mag^-1
     return np.array(n_mag_sfms), np.array(n_mag_pass)
 
-"""
-def optical_mag_fn_dust(hm, obsmag, mag, band, z, params,
-                         include_intrinsic=False):
-    " ""
-    Number density per unit optical magnitude, in a given band, with intrinsic 
-    dust attenuation marginalised.
-    OBSOLETE?
-    " ""
-    # Get dust-uncorrected number density and interpolate
-    n_mag_sfms, n_mag_pass = optical_mag_fn(hm, mag, band, z=z, params=params)
-    nsfms = scipy.interpolate.interp1d(mag, n_mag_sfms, kind='linear', 
-                               bounds_error=False, fill_value=0.)
-    npass = scipy.interpolate.interp1d(mag, n_mag_pass, kind='linear', 
-                               bounds_error=False, fill_value=0.)
-    
-    # Integrate over dust attenuation
-    dm = np.concatenate(([0.,], np.logspace(-6., np.log10(3.), 1e4)))
-    n_mag_sfms_dust = []; n_mag_pass_dust = []
-    for omag in obsmag:
-        m = omag - dm
-        pdf = pdf_optical_dust_atten(omag, m, z=z, params=params)
-        n_mag_sfms_dust.append( -scipy.integrate.trapz((nsfms(m)*pdf), m) )
-        n_mag_pass_dust.append( -scipy.integrate.trapz((npass(m)*pdf), m) )
-    
-    # Return total function (dn/dmag) ~ Mpc^-3 mag^-1
-    if include_intrinsic:
-        return np.array(n_mag_sfms_dust), np.array(n_mag_pass_dust), \
-               np.array(n_mag_sfms), np.array(n_mag_pass)
-    else:
-        return np.array(n_mag_sfms_dust), np.array(n_mag_pass_dust)
-"""
 
 def optical_mag_fn_atten(hm, mag, band, z, params):
     """
@@ -749,122 +642,7 @@ def optical_mag_fn_atten(hm, mag, band, z, params):
     # Return total function (dn/dmag) ~ Mpc^-3 mag^-1
     return np.array(n_mag_sfms), np.array(n_mag_pass)
  
-"""
-def optical_mag_fn_extinction(hm, mag, band, z, params):
-    " ""
-    Number density per unit observed (extincted) optical magnitude, in a given 
-    band.
-    " ""
-    mstar = np.logspace(params['mass_mstar_min'], params['mass_mstar_max'],
-                        100) #params['nsamp_mstar']) # FIXME
-    sfr = np.logspace(params['sfr_min'], params['sfr_max'], params['nsamp_sfr'])
-    
-    # Calculate passive fraction and stellar mass function
-    fpass = f_passive(mstar, z, params=params)
-    dndlogms = stellar_mass_fn(hm, mstar, z, params=params)
-    
-    # Loop over stellar mass and calculate integrand for stellar mass for each 
-    # value of observed magntiude, 'mag'
-    grid_sfms = []; grid_pass = []
-    for _mstar in mstar:
-        
-        print _mstar
-        
-        # Get m_int integration limits (factor of 1.086 comes from conversion 
-        # of exp(-tau) -> delta mag).
-        dm_max = 1.086 * tau_extinction(1., _mstar, band, z, params)
-        dm_min = 1.086 * tau_extinction(0., _mstar, band, z, params)
-        dm = np.linspace(dm_max, dm_min, 500) # FIXME: resolution
-        
-        # Choose a wide enough range to get all viable m_int
-        # FIXME: Check this
-        m_int = np.linspace(np.min(mag) - dm_max, np.max(mag) - dm_min, 500)
-        
-        # Integrate over SFR for each m_int, to get p(m_int | M_*)
-        p_mint_sfms = scipy.interpolate.interp1d( m_int,
-                          [scipy.integrate.simps( 
-                               pdf_sfr_sfms(sfr, _mstar, z, params)
-                             * pdf_optical_mag(m, sfr, _mstar, band, z, params),
-                           sfr) for m in m_int],
-                      kind='linear' )
-        
-        #p_mint_pass = scipy.interpolate.interp1d( m_int,
-        #                  [scipy.integrate.simps( 
-        #                       pdf_sfr_passive(sfr, _mstar, z, params)
-        #                     * pdf_optical_mag(m, sfr, _mstar, band, z, params),
-        #                   sfr) for m in m_int],
-        #              kind='linear' )
-        
-        # Integrate over m_int (weighted by uniform pdf) for each m_obs value
-        grid_sfms.append( [  scipy.integrate.simps(p_mint_sfms(m - dm), m - dm) 
-                              / (dm_max - dm_min)
-                           for m in mag] )
-        #grid_pass.append( [  scipy.integrate.simps(p_mint_pass(m - dm), m - dm) 
-        #                      / (dm_max - dm_min)
-        #                   for m in mag] )
-    
-    # Make into arrays so we can
-    grid_sfms = np.array(grid_sfms)
-    #grid_pass = np.array(grid_pass)
-    
-    # Integrate over M* for SFMS and passive galaxies
-    dndmobs_sfms = [scipy.integrate.simps(
-                        grid_sfms[:,i] * (1. - fpass) * dndlogms,
-                        np.log(mstar)) 
-                    for i in range(len(mag))]
-    #dndmobs_pass = [scipy.integrate.simps(
-    #                    grid_pass[:,i] * fpass * dndlogms,
-    #                    np.log(mstar))
-    #                for i in range(len(mag))]
-    
-    # Return total function (dn/dmag) ~ Mpc^-3 mag^-1
-    return np.array(dndmobs_sfms) #, np.array(dndmobs_pass)
 
-def optical_mag_fn_dust_broken(hm, obsmag, mag, band, z, params,
-                        include_intrinsic=False):
-    " ""
-    Number density per unit optical magnitude, in a given band, with intrinsic 
-    dust attenuation marginalised. # FIXME: Doesn't work for some reason!
-    " ""
-    # Get dust-uncorrected number density and interpolate
-    n_mag_sfms, n_mag_pass = optical_mag_fn(hm, mag, band, z=z, params=params)
-    interp_sfms = scipy.interpolate.interp1d(mag, np.log(n_mag_sfms), 
-                               kind='linear', bounds_error=False, fill_value=0.)
-    interp_pass = scipy.interpolate.interp1d(mag, np.log(n_mag_pass), 
-                               kind='linear', bounds_error=False, fill_value=0.)
-    n_sfms = lambda mag: np.exp(interp_sfms(mag)) # Convert back from log space
-    n_pass = lambda mag: np.exp(interp_pass(mag))
-    
-    # Integrate over dust attenuation to convert intrinsic -> observed mag.
-    n_mag_sfms_dust = []; n_mag_pass_dust = []
-    for omag in obsmag:
-        dm = np.concatenate(([0.,], 
-                   np.logspace(-6., np.log10(3.), 1e4))) # FIXME
-        m = (omag - dm)
-        pdf_dust = pdf_optical_dust_atten(omag, m, z=z, params=params)
-        
-        #P.plot(m, n_sfms(m), 'b-', lw=1.8)
-        #P.plot(m, pdf_dust, 'r-', lw=1.8)
-        #P.plot(m, n_sfms(m) * pdf_dust, 'k-', lw=1.8)
-        
-        print "norm =", scipy.integrate.trapz(pdf_dust, m)
-        
-        n_mag_sfms_dust.append( scipy.integrate.trapz(
-                                   n_sfms(m) * pdf_dust, m) )
-        n_mag_pass_dust.append( scipy.integrate.trapz(
-                                   n_pass(m) * pdf_dust, m) )
-    
-    #P.yscale('log')
-    #P.show()
-    #exit()
-    
-    # Return total function (dn/dmag) ~ Mpc^-3 mag^-1
-    if include_intrinsic:
-        return np.array(n_mag_sfms_dust), np.array(n_mag_pass_dust), \
-               np.array(n_mag_sfms), np.array(n_mag_pass)
-    else:
-        return np.array(n_mag_sfms_dust), np.array(n_mag_pass_dust)
-"""
 #-------------------------------------------------------------------------------
 # Luminosity functions from other sources
 #-------------------------------------------------------------------------------

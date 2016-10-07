@@ -10,6 +10,10 @@ import scipy.interpolate
 from scipy.special import erf, erfinv
 from halomodel import HaloModel
 
+# Choose integration function
+integrate = scipy.integrate.trapz
+#integrate = scipy.integrate.simps
+
 # Central wavelength (in Angstroms) of a given band.
 band_wavelength = {
     'u':    3543.,
@@ -225,7 +229,7 @@ def stellar_mass_fn(hm, mstar, z, params):
     dndlogm = hm.dndlogm(Mh, z)
     
     # Integrate mass fn. over halo mass, weighted by p(M* | M_h), to get n(M*)
-    n_mstar = [ scipy.integrate.simps(
+    n_mstar = [ integrate(
                   dndlogm * pdf_mass_stellar(_mstar, Mh, z, 
                                              params=params),
                   np.log(Mh) ) for _mstar in mstar]
@@ -317,7 +321,7 @@ def pdf_sfr_passive_lognormal(sfr, mstar, z, params, type='shifted'):
         # Take the SFMS powerlaw, shift it by some factor, and change scatter
         assert params['sfr_pass_mshift'] >= 0.
         sigma = params['sfr_pass_sigma'] * np.log(10.) # sigma in dex
-        mean_sfr = sfr_sfms(mstar, z, params=params) * params['sfr_pass_mshift']
+        mean_sfr = sfr_sfms(mstar, z, params) * params['sfr_pass_mshift']
         
         # FIXME
         if 'sfr_sfms_mscale' in params.keys() \
@@ -334,7 +338,7 @@ def pdf_sfr_passive_lognormal(sfr, mstar, z, params, type='shifted'):
          / (np.sqrt(2.*np.pi)*sigma*sfr)
 
 
-def pdf_sfr_passive(sfr, mstar, z, params):
+def pdf_sfr_passive(sfr, mstar, z, params, mean_sfr=None):
     """
     Prob. density function for SFR on the SF main sequence, given stellar mass 
     and redshift, p(SFR | M_*, z).
@@ -361,11 +365,11 @@ def sfr_fn(hm, sfr, z, params):
     
     # Integrate over stellar mass function, weighted by p(SFR | M_*), 
     # to get n(SFR); do this for each population
-    n_sfr_sfms = [ scipy.integrate.simps(
+    n_sfr_sfms = [ integrate(
                     (1.-fpass) * dndlogms * pdf_sfr_sfms(_sfr, mstar, z, 
                                                      params=params),
                     np.log(mstar) ) for _sfr in sfr]
-    n_sfr_pass = [ scipy.integrate.simps(
+    n_sfr_pass = [ integrate(
                     fpass * dndlogms * pdf_sfr_passive(_sfr, mstar, z, 
                                                      params=params),
                     np.log(mstar) ) for _sfr in sfr]
@@ -552,10 +556,18 @@ def pdf_optical_mag_atten(mag, sfr, mstar, band, z, params):
     mean = params['opt_pdf_mean'][i]
     sigma = params['opt_pdf_sigma'][i]
     
+    ############################################################################
     # Terms in analytically-marginalised pdf
     u_mean = np.exp(mean + 0.5*sigma**2.) # shifted mean of log-normal
-    dm0 = 1.086 * tau_extinction(0., mstar, band, z, params) # theta=0
-    dmpi2 = 1.086 * tau_extinction(0.5*np.pi, mstar, band, z, params) # th=pi/2
+    #dm0 = 1.086 * tau_extinction(0., mstar, band, z, params) # theta=0
+    #dmpi2 = 1.086 * tau_extinction(0.5*np.pi, mstar, band, z, params) # th=pi/2
+    
+    # In-line the tau_extinction() function, to save some time
+    dm0 = 1.086 * params['extinction_amp'] \
+        * (mstar / 1e10)**params['extinction_beta'] \
+        * (band_wavelength[band] / 5000.)**params['extinction_alpha'] # theta=0
+    dmpi2 = dm0 * (1. + params['extinction_diskfac']) # pi/2
+    ############################################################################
     
     # Sanitise erf arguments so that x +ve, i.e. take max(x, 0)
     x0 = mu + dm0 + u_mean - mag
@@ -588,20 +600,33 @@ def optical_mag_fn(hm, mag, band, z, params):
     n_mag_sfms = []; n_mag_pass = []
     for m in mag:
         # Evaluate p(mag | SFR, M*) . p(SFR | M*) n(M*) and integrate over M*
-        n_sfms = [scipy.integrate.simps(
+        n_sfms = []; n_pass = []
+        for _sfr in sfr:
+            _pdf_om = pdf_optical_mag(m, _sfr, mstar, band, z, params)
+            n_sfms.append( integrate(
+                                     (1. - fpass) * dndlogms * _pdf_om
+                                     * pdf_sfr_sfms(_sfr, mstar, z, params),
+                           np.log(mstar) ) )
+            n_pass.append( integrate(
+                                     fpass * dndlogms * _pdf_om
+                                     * pdf_sfr_passive(_sfr, mstar, z, params),
+                           np.log(mstar) ) )
+        """
+        # Evaluate p(mag | SFR, M*) . p(SFR | M*) n(M*) and integrate over M*
+        n_sfms = [integrate(
                     (1. - fpass) * dndlogms 
                     * pdf_sfr_sfms(_sfr, mstar, z, params=params)
                     * pdf_optical_mag(m, _sfr, mstar, band, z=z, params=params),
                   np.log(mstar) ) for _sfr in sfr]
-        n_pass = [scipy.integrate.simps(
+        n_pass = [integrate(
                     fpass * dndlogms 
                     * pdf_sfr_passive(_sfr, mstar, z, params=params)
                     * pdf_optical_mag(m, _sfr, mstar, band, z=z, params=params),
                   np.log(mstar) ) for _sfr in sfr]
-        
+        """
         # Integrate over SFR to get n(mag)
-        n_mag_sfms.append( scipy.integrate.simps(n_sfms, sfr) )
-        n_mag_pass.append( scipy.integrate.simps(n_pass, sfr) )
+        n_mag_sfms.append( integrate(n_sfms, sfr) )
+        n_mag_pass.append( integrate(n_pass, sfr) )
     
     # Return total function (dn/dmag) ~ Mpc^-3 mag^-1
     return np.array(n_mag_sfms), np.array(n_mag_pass)
@@ -624,20 +649,33 @@ def optical_mag_fn_atten(hm, mag, band, z, params):
     n_mag_sfms = []; n_mag_pass = []
     for m in mag:
         # Evaluate p(mag | SFR, M*) . p(SFR | M*) n(M*) and integrate over M*
-        n_sfms = [scipy.integrate.simps(
+        n_sfms = []; n_pass = []
+        for _sfr in sfr:
+            _pdf_om = pdf_optical_mag_atten(m, _sfr, mstar, band, z, params)
+            n_sfms.append( integrate(
+                                     (1. - fpass) * dndlogms * _pdf_om
+                                     * pdf_sfr_sfms(_sfr, mstar, z, params),
+                           np.log(mstar) ) )
+            n_pass.append( integrate(
+                                     fpass * dndlogms * _pdf_om
+                                     * pdf_sfr_passive(_sfr, mstar, z, params),
+                           np.log(mstar) ) )
+        """
+        # Evaluate p(mag | SFR, M*) . p(SFR | M*) n(M*) and integrate over M*
+        n_sfms = [integrate(
                     (1. - fpass) * dndlogms 
                     * pdf_sfr_sfms(_sfr, mstar, z, params=params)
                     * pdf_optical_mag_atten(m, _sfr, mstar, band, z, params),
                   np.log(mstar) ) for _sfr in sfr]
-        n_pass = [scipy.integrate.simps(
+        n_pass = [integrate(
                     fpass * dndlogms 
                     * pdf_sfr_passive(_sfr, mstar, z, params=params)
                     * pdf_optical_mag_atten(m, _sfr, mstar, band, z, params),
                   np.log(mstar) ) for _sfr in sfr]
-        
+        """
         # Integrate over SFR to get n(mag)
-        n_mag_sfms.append( scipy.integrate.simps(n_sfms, sfr) )
-        n_mag_pass.append( scipy.integrate.simps(n_pass, sfr) )
+        n_mag_sfms.append( integrate(n_sfms, sfr) )
+        n_mag_pass.append( integrate(n_pass, sfr) )
     
     # Return total function (dn/dmag) ~ Mpc^-3 mag^-1
     return np.array(n_mag_sfms), np.array(n_mag_pass)

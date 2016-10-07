@@ -6,7 +6,7 @@ import numpy as np
 import pylab as P
 from scipy.special import erf
 
-def load_mauch_lf(fname="lumfunc_6dfgs.dat", h=0.7, starburst_corr=False):
+def load_mauch_lf(fname="../lumfns/lumfunc_6dfgs.dat", h=0.7, starburst_corr=False):
     """
     Load 6dFGS star-forming radio galaxy data from Mauch & Sadler 
     (astro-ph/0612018). (z_median = 0.035, assumed h=0.7, omega_m=0.3)
@@ -46,7 +46,7 @@ def load_mauch_lf(fname="lumfunc_6dfgs.dat", h=0.7, starburst_corr=False):
     return L, Phi, errp, errm
 
 
-def load_gama_lf(band, froot="lumfns/lf%s_z0_driver12.data", h=0.7):
+def load_gama_lf(band, froot="../lumfns/lf%s_z0_driver12.data", h=0.7):
     """
     Load GAMA optical luminosity functions from Driver et al. (2012).
     (assumes omega_m = 0.27, and in h units)
@@ -63,7 +63,8 @@ def load_gama_lf(band, froot="lumfns/lf%s_z0_driver12.data", h=0.7):
     
     return gama_mag[idxs], gama_n[idxs], gama_err[idxs]
 
-def load_sdss_smf(froot="lumfns/moustakas_smf.dat", h=0.7, convert_errors=False):
+def load_sdss_smf(froot="../lumfns/moustakas_smf.dat", h=0.7, 
+                  convert_errors=False, mstar_min=None):
     """
     Load SDSS-GALEX stellar mass functions (z = 0.01 - 0.2) from Moustakas et 
     al. 2013 [1301.1688].
@@ -102,5 +103,11 @@ def load_sdss_smf(froot="lumfns/moustakas_smf.dat", h=0.7, convert_errors=False)
         sf_errm = sf_phi * (1. - 10.**sf_errm)
         qu_errm = qu_phi * (1. - 10.**qu_errm)
     
+    # Apply a cut (minimum) in mstar
+    if mstar_min is not None:
+        idxs = np.where(ms >= mstar_min)
+        ms, sf_phi, sf_errp, sf_errm, qu_phi, qu_errp, qu_errm = \
+            [f[idxs] 
+             for f in [ms, sf_phi, sf_errp, sf_errm, qu_phi, qu_errp, qu_errm]]
     return ms, sf_phi, sf_errp, sf_errm, qu_phi, qu_errp, qu_errm
     

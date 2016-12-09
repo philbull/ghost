@@ -113,7 +113,7 @@ class HaloModel(object):
         
         # Calculate sigma(R) for this mass scale
         R = self.R_for_M(M)
-        sigR = self, sigma_R(R, z)
+        sigR = np.array([self.sigma_R(_R, z) for _R in R])
         
         # Calculate Eulerian bias
         delta1 = delta_c # FIXME: Not strictly correct, should be fn. of Omega_m

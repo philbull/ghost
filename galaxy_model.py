@@ -1,7 +1,9 @@
 #!/usr/bin/python
 """
-Calculate the AGN fraction and luminosity distribution as a function of M_* 
-and z, using the pdfs from Aird et al. (2012) [1107.4368], Eq. 12 and Table 2.
+Core code of the `ghost' analytic galaxy-halo model, including pdf definitions 
+and convenience functions for calculating observables.
+
+  -- Phil Bull 2016 <philbull@gmail.com>
 """
 import numpy as np
 import pylab as P
@@ -187,6 +189,10 @@ def pdf_mass_stellar_cen(Ms, Mh, z, params):
     sigma = sigma_inf + sigma1*(1. - 2./np.pi * np.arctan(xi*np.log10(Mh/M2)))
     sigma *= np.log(10.) # sigma in dex
     
+    # Ensure that sigma is +ve, and larger than the value needed for 
+    # integration to converge
+    sigma[np.where(sigma < 2e-2)] = 2e-2
+    
     # Return pdf
     return np.exp(-np.log(Ms/mean_ms)**2./(2.*sigma**2.)) \
          / (np.sqrt(2.*np.pi)*sigma*Ms)
@@ -227,6 +233,35 @@ def stellar_mass_fn(hm, mstar, z, params):
     Mh = np.logspace(params['mass_mhalo_min'], params['mass_mhalo_max'], 
                      params['nsamp_mhalo'])
     dndlogm = hm.dndlogm(Mh, z)
+    
+    """
+    ######################################
+    # FIXME
+    P.subplot(111)
+    print "mstar =", mstar[-35:-34]
+    for _mstar in mstar[-35:-34]:
+        P.plot(Mh, pdf_mass_stellar(_mstar, Mh, z, params=params))
+        
+    P.plot(Mh, mass_stellar_cen(Mh, z, params=params), 'g-', lw=1.8)
+    
+    
+    sigma_inf = params['ms_cen_sigmainf']
+    sigma1 = params['ms_cen_sigma1']
+    M2 = 10.**params['ms_cen_logM2']
+    xi = params['ms_cen_xi']
+    # Scatter as a fn. of halo mass [Eq. 12 of Moster et al. (2010)]
+    sigma = sigma_inf + sigma1*(1. - 2./np.pi * np.arctan(xi*np.log10(Mh/M2)))
+    sigma *= np.log(10.) # sigma in dex
+    
+    P.plot(Mh, np.abs(sigma), 'r-', lw=1.8)
+    
+    P.xscale('log')
+    P.yscale('log')
+    
+    P.show()
+    exit()
+    ######################################
+    """
     
     # Integrate mass fn. over halo mass, weighted by p(M* | M_h), to get n(M*)
     n_mstar = [ integrate(
@@ -288,11 +323,11 @@ def pdf_sfr_sfms(sfr, mstar, z, params):
     mean_sfr = sfr_sfms(mstar, z, params=params)
     
     # FIXME
-    if 'sfr_sfms_mscale' in params.keys() \
-    and 'sfr_sfms_gamma' in params.keys():
-        mscale = 10.**params['sfr_sfms_mscale']
-        gamma = params['sfr_sfms_gamma']
-        mean_sfr *= (1. - np.exp(-(mstar/mscale)**gamma))
+    #if 'sfr_sfms_mscale' in params.keys() \
+    #and 'sfr_sfms_gamma' in params.keys():
+    #    mscale = 10.**params['sfr_sfms_mscale']
+    #    gamma = params['sfr_sfms_gamma']
+    #    mean_sfr *= (1. - np.exp(-(mstar/mscale)**gamma))
     
     return np.exp(-np.log(sfr/mean_sfr)**2./(2.*sigma**2.)) \
          / (np.sqrt(2.*np.pi)*sigma*sfr)
@@ -324,11 +359,11 @@ def pdf_sfr_passive_lognormal(sfr, mstar, z, params, type='shifted'):
         mean_sfr = sfr_sfms(mstar, z, params) * params['sfr_pass_mshift']
         
         # FIXME
-        if 'sfr_sfms_mscale' in params.keys() \
-        and 'sfr_sfms_gamma' in params.keys():
-            mscale = 10.**params['sfr_pass_mscale']
-            gamma = params['sfr_pass_gamma']
-            mean_sfr *= (1. - np.exp(-(mstar/mscale)**gamma))
+        #if 'sfr_sfms_mscale' in params.keys() \
+        #and 'sfr_sfms_gamma' in params.keys():
+        #    mscale = 10.**params['sfr_pass_mscale']
+        #    gamma = params['sfr_pass_gamma']
+        #    mean_sfr *= (1. - np.exp(-(mstar/mscale)**gamma))
     else:
         # Use a different powerlaw to the SFMS, and a different scatter
         sigma = params['sfr_pass_sigma'] * np.log(10.) # sigma in dex
@@ -471,17 +506,21 @@ def tau_extinction(sintheta, mstar, band, z, params):
     Dust extinction optical depth as a function of inclination angle.
     """
     # Extinction parameters
-    A = params['extinction_amp']
+    tau0 = params['extinction_tau0']
     beta = params['extinction_beta']
-    kappa = params['extinction_diskfac']
-    alpha = params['extinction_alpha']
+    adisk = params['extinction_diskfac']
+    kappa = params['extinction_kappa']
+    lambda0 = params['extinction_lambda0']
     
     # Get band wavelength
     l = band_wavelength[band]
     
     # Calculate optical depth and return
-    return A * (mstar / 1e10)**beta * (1. + kappa*sintheta) \
-             * (l / 5000.)**alpha
+    tau = tau0 * (mstar / 1e11)**beta * (1. + adisk*sintheta) \
+        * np.exp(-kappa * (l - lambda0))
+    #tau = A * (mstar / 1e11)**beta * (1. + kappa*sintheta) \
+    #        * (l / 5000.)**alpha
+    return tau
 
 def optical_mag(sfr, mstar, band, z, params):
     """
@@ -563,10 +602,15 @@ def pdf_optical_mag_atten(mag, sfr, mstar, band, z, params):
     #dmpi2 = 1.086 * tau_extinction(0.5*np.pi, mstar, band, z, params) # th=pi/2
     
     # In-line the tau_extinction() function, to save some time
-    dm0 = 1.086 * params['extinction_amp'] \
-        * (mstar / 1e10)**params['extinction_beta'] \
-        * (band_wavelength[band] / 5000.)**params['extinction_alpha'] # theta=0
-    dmpi2 = dm0 * (1. + params['extinction_diskfac']) # pi/2
+    tau0 = params['extinction_tau0']
+    beta = params['extinction_beta']
+    adisk = params['extinction_diskfac']
+    kappa = params['extinction_kappa']
+    lambda0 = params['extinction_lambda0']
+    
+    dm0 = 1.086 * tau0 * (mstar / 1e11)**beta \
+                * np.exp(-kappa * (band_wavelength[band] - lambda0)) # theta=0
+    dmpi2 = dm0 * (1. + adisk) # theta=pi/2
     ############################################################################
     
     # Sanitise erf arguments so that x +ve, i.e. take max(x, 0)
@@ -581,6 +625,13 @@ def pdf_optical_mag_atten(mag, sfr, mstar, band, z, params):
     
     # Construct pdf, p(m_int | M*, SFR)
     pdf = 0.5 * (erf(ypi2) - erf(y0)) / (dmpi2 - dm0)
+    
+    # Sanitise parts of pdf where the extinction is negligible; just return the 
+    # standard unextincted result
+    u = mu + u_mean - mag
+    idxs = np.where(np.logical_and( np.abs(dm0 - dmpi2) < 1e-8, u > 0. ))
+    pdf[idxs] = np.exp(-0.5 * ((np.log(u[idxs]) - mean) / sigma)**2.) \
+              / (np.sqrt(2.*np.pi) * u[idxs] * sigma)
     return pdf
     
 
@@ -679,8 +730,84 @@ def optical_mag_fn_atten(hm, mag, band, z, params):
     
     # Return total function (dn/dmag) ~ Mpc^-3 mag^-1
     return np.array(n_mag_sfms), np.array(n_mag_pass)
- 
 
+
+def joint_optical_mag_fn_atten(hm, mag1, mag2, band1, band2, z, params):
+    """
+    Number density per unit observed (extincted) optical magnitude, in two 
+    given bands. Uses an analytic marginalisation for extinction.
+    """
+    # FIXME: Needs testing for correctness
+    mstar = np.logspace(params['mass_mstar_min'], params['mass_mstar_max'],
+                        params['nsamp_mstar'])
+    sfr = np.logspace(params['sfr_min'], params['sfr_max'], params['nsamp_sfr'])
+    
+    # Calculate passive fraction and stellar mass function
+    fpass = f_passive(mstar, z, params=params)
+    dndlogms = stellar_mass_fn(hm, mstar, z, params=params)
+    
+    # Evaluate p(mag1 | SFR, M*) p(mag2 | SFR, M*) p(SFR | M*) n(M*) 
+    # and integrate over M*. Assumes magnitude pdfs are independent.
+    n_sfms = []; n_pass = []
+    for _sfr in sfr:
+        pdf_om1 = pdf_optical_mag_atten(mag1, _sfr, mstar, band1, z, params)
+        pdf_om2 = pdf_optical_mag_atten(mag2, _sfr, mstar, band2, z, params)
+        n_sfms.append( integrate(
+                           (1. - fpass) * dndlogms * pdf_om1 * pdf_om2
+                           * pdf_sfr_sfms(_sfr, mstar, z, params),
+                       np.log(mstar) ) )
+        n_pass.append( integrate(
+                           fpass * dndlogms * pdf_om1 * pdf_om2
+                           * pdf_sfr_passive(_sfr, mstar, z, params),
+                       np.log(mstar) ) )
+    # Integrate over SFR to get n(mag)
+    n_mag_sfms = integrate(n_sfms, sfr)
+    n_mag_pass = integrate(n_pass, sfr)
+    
+    # Return total function (dn/dmag1/dmag2) ~ Mpc^-3 mag^-1
+    return n_mag_sfms, n_mag_pass
+
+
+def joint_lumfn_sfr_optical(hm, sfr, mag, band, z, params, atten=True):
+    """
+    Joint luminosity function for tracers of SFR and optical magnitudes.
+    """
+    mstar = np.logspace(params['mass_mstar_min'], params['mass_mstar_max'],
+                        params['nsamp_mstar'])
+    
+    # Calculate passive fraction and stellar mass function
+    fpass = f_passive(mstar, z, params=params)
+    dndlogms = stellar_mass_fn(hm, mstar, z, params=params)
+    
+    # Evaluate joint lum. fn. on a grid in SFR and (dust-atten.) optical mag.
+    # The pdf for the SFR tracer is assumed to be a delta-fn., so the SFR 
+    # integral has effectively already been evaluated in this expression.
+    n_sfms = []; n_pass = []
+    for _sfr in sfr:
+        _nsfms = []; _npass = []
+        for _mag in mag:
+        
+            # Apply dust attenuation correction (or not)
+            if atten:
+                pdf_mag = pdf_optical_mag_atten(_mag, _sfr, mstar, band, z, params)
+            else:
+                pdf_mag = pdf_optical_mag(_mag, _sfr, mstar, band, z, params)
+            
+            # Integrate over stellar mass
+            _nsfms.append( integrate(
+                               (1. - fpass) * dndlogms * pdf_mag
+                               * pdf_sfr_sfms(_sfr, mstar, z, params),
+                           np.log(mstar) ) )
+            _npass.append( integrate(
+                               fpass * dndlogms * pdf_mag
+                               * pdf_sfr_passive(_sfr, mstar, z, params),
+                           np.log(mstar) ) )
+        n_sfms.append(_nsfms)
+        n_pass.append(_npass)
+    
+    # Return joint luminosity fns., dn(SFR, mag)/dSFR/dmag
+    return np.array(n_sfms), np.array(n_pass)
+    
 #-------------------------------------------------------------------------------
 # Luminosity functions from other sources
 #-------------------------------------------------------------------------------

@@ -234,35 +234,6 @@ def stellar_mass_fn(hm, mstar, z, params):
                      params['nsamp_mhalo'])
     dndlogm = hm.dndlogm(Mh, z)
     
-    """
-    ######################################
-    # FIXME
-    P.subplot(111)
-    print "mstar =", mstar[-35:-34]
-    for _mstar in mstar[-35:-34]:
-        P.plot(Mh, pdf_mass_stellar(_mstar, Mh, z, params=params))
-        
-    P.plot(Mh, mass_stellar_cen(Mh, z, params=params), 'g-', lw=1.8)
-    
-    
-    sigma_inf = params['ms_cen_sigmainf']
-    sigma1 = params['ms_cen_sigma1']
-    M2 = 10.**params['ms_cen_logM2']
-    xi = params['ms_cen_xi']
-    # Scatter as a fn. of halo mass [Eq. 12 of Moster et al. (2010)]
-    sigma = sigma_inf + sigma1*(1. - 2./np.pi * np.arctan(xi*np.log10(Mh/M2)))
-    sigma *= np.log(10.) # sigma in dex
-    
-    P.plot(Mh, np.abs(sigma), 'r-', lw=1.8)
-    
-    P.xscale('log')
-    P.yscale('log')
-    
-    P.show()
-    exit()
-    ######################################
-    """
-    
     # Integrate mass fn. over halo mass, weighted by p(M* | M_h), to get n(M*)
     n_mstar = [ integrate(
                   dndlogm * pdf_mass_stellar(_mstar, Mh, z, 

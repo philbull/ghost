@@ -16,14 +16,14 @@
 
 // Define optical frequency bands
 const char BAND_NAMES[5] = "ugriz";
-const float BAND_WAVELENGTHS[5] = {3543., 4770., 6231., 7625., 9134.};
+const double BAND_WAVELENGTHS[5] = {3543., 4770., 6231., 7625., 9134.};
 const int BAND_NUM = 5;
 
 struct Catalogue{
-    float *mhalo;
-    float *z;
-    float *mstar;
-    float *sfr;
+    double *mhalo;
+    double *z;
+    double *mstar;
+    double *sfr;
     bool *passive;
     int nhalos;
 };
@@ -32,50 +32,50 @@ struct Catalogue{
 struct Params{
     
     // Stellar mass-halo mass relation for centrals
-    float ms_cen_logM1;
-    float ms_cen_norm;
-    float ms_cen_mu;
-    float ms_cen_nu;
-    float ms_cen_beta0;
-    float ms_cen_beta1;
-    float ms_cen_gamma0;
-    float ms_cen_gamma1;
-    float ms_cen_logM2;
-    float ms_cen_sigmainf;
-    float ms_cen_sigma1;
-    float ms_cen_xi;
+    double ms_cen_logM1;
+    double ms_cen_norm;
+    double ms_cen_mu;
+    double ms_cen_nu;
+    double ms_cen_beta0;
+    double ms_cen_beta1;
+    double ms_cen_gamma0;
+    double ms_cen_gamma1;
+    double ms_cen_logM2;
+    double ms_cen_sigmainf;
+    double ms_cen_sigma1;
+    double ms_cen_xi;
     
     // Passive fraction parameters
-    float fpass_alpha0;
-    float fpass_alpha1;
-    float fpass_beta;
-    float fpass_zeta;
+    double fpass_alpha0;
+    double fpass_alpha1;
+    double fpass_beta;
+    double fpass_zeta;
     
     // SFMS parameters
-    float sfr_sfms_alpha0;
-    float sfr_sfms_alpha1;
-    float sfr_sfms_beta;
-    float sfr_sfms_sigma;
+    double sfr_sfms_alpha0;
+    double sfr_sfms_alpha1;
+    double sfr_sfms_beta;
+    double sfr_sfms_sigma;
     
     // Passive sequence parameters
-    float sfr_pass_mshift;
-    float sfr_pass_sigma;
+    double sfr_pass_mshift;
+    double sfr_pass_sigma;
     
     // Optical extinction parameters
-    float extinction_tau0;
-    float extinction_beta;
-    float extinction_diskfac;
-    float extinction_kappa;
-    float extinction_lambda0;
+    double extinction_tau0;
+    double extinction_beta;
+    double extinction_diskfac;
+    double extinction_kappa;
+    double extinction_lambda0;
     
     // Optical parameters
-    float opt_mstar_amp;
-    float opt_mstar_c;
-    float opt_mstar_beta;
-    float opt_cross_amp[5];
-    float opt_cross_beta;
-    float opt_cross_gamma;
-    float opt_offset[5];
+    double opt_mstar_amp;
+    double opt_mstar_c;
+    double opt_mstar_beta;
+    double opt_cross_amp[5];
+    double opt_cross_beta;
+    double opt_cross_gamma;
+    double opt_offset[5];
     
 };
 
@@ -111,7 +111,7 @@ void load_halos_from_file(char* fname, struct Catalogue *cat){
     */
     int success;
     char *buf = NULL;
-    float temp;
+    double temp;
     size_t len;
     FILE *f;
     
@@ -125,8 +125,8 @@ void load_halos_from_file(char* fname, struct Catalogue *cat){
     rewind(f); // Return to start of file
     
     // Allocate halo arrays
-    cat->mhalo = malloc(sizeof(float) * (cat->nhalos));
-    cat->z = malloc(sizeof(float) * (cat->nhalos));
+    cat->mhalo = malloc(sizeof(double) * (cat->nhalos));
+    cat->z = malloc(sizeof(double) * (cat->nhalos));
     
     // Load catalogue into arrays (assumes only two columns, space-separated)
     for(int i=0; i < cat->nhalos; i++){
@@ -231,13 +231,13 @@ void default_params(struct Params *p){
 // ghost model pdfs and supporting functions
 ////////////////////////////////////////////////////////////////////////////////
 
-float mass_stellar_cen(float mhalo, float z, struct Params p){
+double mass_stellar_cen(double mhalo, double z, struct Params p){
     /*
     Fitting function for the central galaxy stellar mass of a given halo, 
     using Eq.2 of Moster, B. P. et al. 2010, ApJ, 710, 903.
     [Mvir should be in Msun]
     */
-    float logM1, M1, norm, beta, gamma;
+    double logM1, M1, norm, beta, gamma;
     
     // Redshift-dependent functions (Eqs. 23-26 of Moster et al.)
     logM1 = p.ms_cen_logM1 * pow(1. + z, p.ms_cen_mu);
@@ -250,12 +250,12 @@ float mass_stellar_cen(float mhalo, float z, struct Params p){
 }
 
 
-float pdf_mass_stellar_cen(float mhalo, float z, struct Params p, gsl_rng *rng){
+double pdf_mass_stellar_cen(double mhalo, double z, struct Params p, gsl_rng *rng){
     /*
     Prob. density function for stellar mass, given halo mass and redshift. Uses 
     the form from Moster et al. (2010). Central galaxies.
     */
-    float M2, mean_ms, sigma;
+    double M2, mean_ms, sigma;
     
     // Mean stellar mass as fn. of halo mass
     mean_ms = mass_stellar_cen(mhalo, z, p);
@@ -279,20 +279,20 @@ float pdf_mass_stellar_cen(float mhalo, float z, struct Params p, gsl_rng *rng){
 }
 
 
-float f_passive(float mstar, float z, struct Params p){
+double f_passive(double mstar, double z, struct Params p){
     /*
     Fraction of passive galaxies at a given stellar mass and redshift.
     */
-    float c = 0.5 * (1. + tanh(p.fpass_zeta));
+    double c = 0.5 * (1. + tanh(p.fpass_zeta));
     return c + (1. - c) 
       / pow( 1. + (mstar / pow(10., p.fpass_alpha0 + p.fpass_alpha1*z)), p.fpass_beta);
 }
 
-bool pdf_galaxy_type(float mstar, float z, struct Params p, gsl_rng *rng){
+bool pdf_galaxy_type(double mstar, double z, struct Params p, gsl_rng *rng){
     /*
     Draw galaxy type (passive vs. star-forming).
     */
-    float fpass = f_passive(mstar, z, p);
+    double fpass = f_passive(mstar, z, p);
     
     // Draw uniform random number and apply passive cut
     if(gsl_rng_uniform(rng) > fpass){
@@ -303,7 +303,7 @@ bool pdf_galaxy_type(float mstar, float z, struct Params p, gsl_rng *rng){
 }
 
 
-float sfr_sfms(float mstar, float z, struct Params p){
+double sfr_sfms(double mstar, double z, struct Params p){
     /*
     Mean SFR of the star-formation main sequence.
     */
@@ -315,7 +315,7 @@ float sfr_sfms(float mstar, float z, struct Params p){
 /////////////////////////////// FIXME: passive sequence
 
 
-float pdf_sfr_sfms(float mstar, float z, struct Params p, gsl_rng *rng){
+double pdf_sfr_sfms(double mstar, double z, struct Params p, gsl_rng *rng){
     /*
     Prob. density function for SFR on the SF main sequence, given stellar mass 
     and redshift, p(SFR | M_*, z).
@@ -327,7 +327,7 @@ float pdf_sfr_sfms(float mstar, float z, struct Params p, gsl_rng *rng){
     //     / (np.sqrt(2.*np.pi)*sigma*sfr)
 }
 
-float pdf_sfr_passive_lognormal(float mstar, float z, struct Params p, gsl_rng *rng){
+double pdf_sfr_passive_lognormal(double mstar, double z, struct Params p, gsl_rng *rng){
     /*
     Prob. density function for SFR on the SF main sequence, given stellar mass 
     and redshift, p(SFR | M_*, z). [log-normal version]
@@ -345,12 +345,12 @@ float pdf_sfr_passive_lognormal(float mstar, float z, struct Params p, gsl_rng *
     //     / (np.sqrt(2.*np.pi)*sigma*sfr)
 }
 
-float tau_extinction(float sintheta, float mstar, char band, float z, 
+double tau_extinction(double sintheta, double mstar, char band, double z, 
                      struct Params p){
     /*
     Dust extinction optical depth as a function of inclination angle.
     */
-    float l;
+    double l;
     
     // Get band wavelength
     l = BAND_WAVELENGTHS[band_index(band)];
@@ -361,14 +361,14 @@ float tau_extinction(float sintheta, float mstar, char band, float z,
             * exp(-p.extinction_kappa * (l - p.extinction_lambda0));
 }
 
-float optical_mag(float sfr, float mstar, char band, float z, struct Params p){
+double optical_mag(double sfr, double mstar, char band, double z, struct Params p){
     /*
     Return the predicted optical magnitude given the stellar mass and SFR. 
     Calculated using an ansatz with best-fit parameters calibrated against 
     the Guo et al. catalogue.
     */
     int i;
-    float mag;
+    double mag;
     
     // Figure out which band to use
     i = band_index(band);
@@ -428,7 +428,7 @@ void main(int argc, const char* argv[]){
      * 
      */
     bool *passive;
-    float **catalogue;
+    double **catalogue;
     struct Params p;
     struct Catalogue cat;
     gsl_rng *rng;
@@ -445,8 +445,8 @@ void main(int argc, const char* argv[]){
     load_halos_from_file("test.dat", &cat);
     
     // Allocate arrays for catalogue variables
-    cat.mstar = (float*)malloc(sizeof(float) * (cat.nhalos));
-    cat.sfr = (float*)malloc(sizeof(float) * (cat.nhalos));
+    cat.mstar = (double*)malloc(sizeof(double) * (cat.nhalos));
+    cat.sfr = (double*)malloc(sizeof(double) * (cat.nhalos));
     cat.passive = (bool*)malloc(sizeof(bool) * (cat.nhalos));
     
     // Realise all variables in catalogue

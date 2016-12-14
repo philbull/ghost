@@ -5,67 +5,69 @@
 #include "numpy/arrayobject.h"
 #include "ghmock.h"
 
-/*
-IN PROGRESS
-void extract_params(PyObject *params, struct Params *p){
-    / *
+void set_params(PyObject *params, struct Params *p){
+    /*
     Convert a Python parameter dictionary to a C struct.
-    * /
-    PyObject*
+    */
+    PyObject *key, *val;
     
-    int PyDict_Contains();
+    //----------------------------------------
+    // Preprocessor code
     
-    PyObject* PyDict_GetItem(PyObject *p, PyObject *key)
+    // C preprocessor definition to set value in Params for each item found 
+    // in parameter dictionary
+    #define set_param_from_dict(NAME)            \
+        key = PyString_FromString(""#NAME"");    \
+        if (PyDict_Contains(params, key)){       \
+            val = PyDict_GetItem(params, key);   \
+            p->NAME = PyFloat_AsDouble(val);     \
+        }
     
-    p->ms_cen_logM1;
+    // Specify which parameters to look for in dict
+    set_param_from_dict( ms_cen_logM1 );
+    set_param_from_dict( ms_cen_norm );
+    set_param_from_dict( ms_cen_mu );
+    set_param_from_dict( ms_cen_nu );
+    set_param_from_dict( ms_cen_beta0 );
+    set_param_from_dict( ms_cen_beta1 );
+    set_param_from_dict( ms_cen_gamma0 );
+    set_param_from_dict( ms_cen_gamma1 );
+    set_param_from_dict( ms_cen_logM2 );
+    set_param_from_dict( ms_cen_sigmainf );
+    set_param_from_dict( ms_cen_sigma1 );
+    set_param_from_dict( ms_cen_xi );
+    set_param_from_dict( fpass_alpha0 );
+    set_param_from_dict( fpass_alpha1 );
+    set_param_from_dict( fpass_beta );
+    set_param_from_dict( fpass_zeta );
+    set_param_from_dict( sfr_sfms_alpha0 );
+    set_param_from_dict( sfr_sfms_alpha1 );
+    set_param_from_dict( sfr_sfms_beta );
+    set_param_from_dict( sfr_sfms_sigma );
+    set_param_from_dict( sfr_pass_mshift );
+    set_param_from_dict( sfr_pass_sigma );
+    set_param_from_dict( extinction_tau0 );
+    set_param_from_dict( extinction_beta );
+    set_param_from_dict( extinction_diskfac );
+    set_param_from_dict( extinction_kappa );
+    set_param_from_dict( extinction_lambda0 );
+    set_param_from_dict( opt_mstar_amp );
+    set_param_from_dict( opt_mstar_c );
+    set_param_from_dict( opt_mstar_beta );
+    set_param_from_dict( opt_cross_beta );
+    set_param_from_dict( opt_cross_gamma );
+    // End preprocessor code
+    // FIXME: Need to set params for array-like variables!
+    //----------------------------------------
     
-    ms_cen_logM1;
-    double ms_cen_norm;
-    double ms_cen_mu;
-    double ms_cen_nu;
-    double ms_cen_beta0;
-    double ms_cen_beta1;
-    double ms_cen_gamma0;
-    double ms_cen_gamma1;
-    double ms_cen_logM2;
-    double ms_cen_sigmainf;
-    double ms_cen_sigma1;
-    double ms_cen_xi;
-    
-    // Passive fraction parameters
-    double fpass_alpha0;
-    double fpass_alpha1;
-    double fpass_beta;
-    double fpass_zeta;
-    
-    // SFMS parameters
-    double sfr_sfms_alpha0;
-    double sfr_sfms_alpha1;
-    double sfr_sfms_beta;
-    double sfr_sfms_sigma;
-    
-    // Passive sequence parameters
-    double sfr_pass_mshift;
-    double sfr_pass_sigma;
-    
-    // Optical extinction parameters
-    double extinction_tau0;
-    double extinction_beta;
-    double extinction_diskfac;
-    double extinction_kappa;
-    double extinction_lambda0;
-    
-    // Optical parameters
-    double opt_mstar_amp;
-    double opt_mstar_c;
-    double opt_mstar_beta;
-    double opt_cross_amp[5];
-    double opt_cross_beta;
-    double opt_cross_gamma;
-    double opt_offset[5];
-    * /
+    // Raise warning if error occurred
+    if(PyErr_Occurred()){
+        PyErr_SetString(PyExc_ValueError, 
+            "set_params() failed: a value in 'params' probably couldn't be cast to the right type.");
+        PyErr_Print();
+        return;
+    }
 }
-*/
 
 static PyObject* realise(PyObject *dummy, PyObject *args){
     /*
@@ -77,18 +79,21 @@ static PyObject* realise(PyObject *dummy, PyObject *args){
     gsl_rng_env_setup();
     rng = gsl_rng_alloc( gsl_rng_default );
     
-    // Get default model parameters (FIXME)
-    struct Params p;
-    default_params(&p);
-    
     // Halo catalogue input arrays
-    PyObject *arg_mhalo, *arg_z;
+    PyObject *arg_mhalo, *arg_z, *arg_params;
     
     // Get halo catalogue arrays from input arguments
-    if (!PyArg_ParseTuple(args, "OO", &arg_mhalo, &arg_z)){
+    if (!PyArg_ParseTuple(args, "OOO", &arg_mhalo, &arg_z, &arg_params)){
         PyErr_SetString(PyExc_RuntimeError, "Failed to interpret input arguments.");
         return NULL;
     }
+    
+    // Populate parameter struct with default parameter values
+    struct Params p;
+    default_params(&p);
+    
+    // Set parameters defined in input parameter dict
+    set_params(arg_params, &p);
     
     // Construct Catalogue structure to manage variables
     struct Catalogue cat;
@@ -96,8 +101,7 @@ static PyObject* realise(PyObject *dummy, PyObject *args){
     // Convert input arguments to numpy arrays and expose C pointers to data
     PyObject *np_mhalo = PyArray_FROM_OTF(arg_mhalo, NPY_DOUBLE, NPY_IN_ARRAY);
     PyObject *np_z = PyArray_FROM_OTF(arg_z, NPY_DOUBLE, NPY_IN_ARRAY);
-    // Get length of input arrays
-    int N = (int)PyArray_DIM(np_mhalo, 0);
+    int N = (int)PyArray_DIM(np_mhalo, 0); // Get length of input arrays
     
     // Create new ndarrays and provide data access pointers for C code
     int ndim = 1;

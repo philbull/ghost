@@ -5,79 +5,12 @@
  *   -- Phil Bull 2016 <philbull@gmail.com>
  */
 
-#include <omp.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <math.h>
-#include <assert.h>
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_randist.h>
+#include "ghmock.h"
 
 // Define optical frequency bands
 const char BAND_NAMES[5] = "ugriz";
 const double BAND_WAVELENGTHS[5] = {3543., 4770., 6231., 7625., 9134.};
 const int BAND_NUM = 5;
-
-struct Catalogue{
-    double *mhalo;
-    double *z;
-    double *mstar;
-    double *sfr;
-    bool *passive;
-    int nhalos;
-};
-
-// Parameters of the model
-struct Params{
-    
-    // Stellar mass-halo mass relation for centrals
-    double ms_cen_logM1;
-    double ms_cen_norm;
-    double ms_cen_mu;
-    double ms_cen_nu;
-    double ms_cen_beta0;
-    double ms_cen_beta1;
-    double ms_cen_gamma0;
-    double ms_cen_gamma1;
-    double ms_cen_logM2;
-    double ms_cen_sigmainf;
-    double ms_cen_sigma1;
-    double ms_cen_xi;
-    
-    // Passive fraction parameters
-    double fpass_alpha0;
-    double fpass_alpha1;
-    double fpass_beta;
-    double fpass_zeta;
-    
-    // SFMS parameters
-    double sfr_sfms_alpha0;
-    double sfr_sfms_alpha1;
-    double sfr_sfms_beta;
-    double sfr_sfms_sigma;
-    
-    // Passive sequence parameters
-    double sfr_pass_mshift;
-    double sfr_pass_sigma;
-    
-    // Optical extinction parameters
-    double extinction_tau0;
-    double extinction_beta;
-    double extinction_diskfac;
-    double extinction_kappa;
-    double extinction_lambda0;
-    
-    // Optical parameters
-    double opt_mstar_amp;
-    double opt_mstar_c;
-    double opt_mstar_beta;
-    double opt_cross_amp[5];
-    double opt_cross_beta;
-    double opt_cross_gamma;
-    double opt_offset[5];
-    
-};
 
 ////////////////////////////////////////////////////////////////////////////////
 // I/O utility functions
@@ -111,7 +44,6 @@ void load_halos_from_file(char* fname, struct Catalogue *cat){
     */
     int success;
     char *buf = NULL;
-    double temp;
     size_t len;
     FILE *f;
     
@@ -132,11 +64,15 @@ void load_halos_from_file(char* fname, struct Catalogue *cat){
     for(int i=0; i < cat->nhalos; i++){
         // Halo mass (column 0)
         success = getdelim(&buf, &len, ' ', f);
-        (cat->mhalo)[i] = strtof(buf, NULL);
+        if(success){
+            (cat->mhalo)[i] = strtof(buf, NULL);
+        }
         
         // Redshift (column 1)
         success = getdelim(&buf, &len, '\n', f);
-        (cat->z)[i] = strtof(buf, NULL);
+        if(success){
+            (cat->z)[i] = strtof(buf, NULL);
+        }
     }
     
     // Close file and free buffers
@@ -150,13 +86,12 @@ void save_catalogue(char* fname, struct Catalogue *cat){
     Save generated mock catalogue to file.
     */
     FILE *f;
-    int i, j;
     
     // Open file for writing
     f = fopen(fname, "w");
     
     // Loop through halos
-    for(i=0; i < cat->nhalos; i++){
+    for(int i=0; i < cat->nhalos; i++){
         fprintf(f, "%12.8e %12.8e\n", cat->mhalo[i], cat->z[i]);
     } // end i loop
     
@@ -165,7 +100,6 @@ void save_catalogue(char* fname, struct Catalogue *cat){
     // Close file
     fclose(f);
 }
-
 
 
 void default_params(struct Params *p){
@@ -274,8 +208,8 @@ double pdf_mass_stellar_cen(double mhalo, double z, struct Params p, gsl_rng *rn
     return gsl_ran_lognormal(rng, 
                              log(mean_ms),
                              sigma); // FIXME: wrong args?!
-    //return exp(-log(mstar/mean_ms)**2./(2.*sigma**2.)) \
-    //     / (np.sqrt(2.*np.pi)*sigma*Ms);
+    /*return exp(-log(mstar/mean_ms)**2./(2.*sigma**2.)) \
+         / (np.sqrt(2.*np.pi)*sigma*Ms); */
 }
 
 
@@ -323,8 +257,8 @@ double pdf_sfr_sfms(double mstar, double z, struct Params p, gsl_rng *rng){
     return gsl_ran_lognormal(rng,
                              log( sfr_sfms(mstar, z, p) ), 
                              p.sfr_sfms_sigma * log(10.)); // FIXME: wrong args?
-    //return np.exp(-np.log(sfr/mean_sfr)**2./(2.*sigma**2.)) \
-    //     / (np.sqrt(2.*np.pi)*sigma*sfr)
+    /*return np.exp(-np.log(sfr/mean_sfr)**2./(2.*sigma**2.)) \
+         / (np.sqrt(2.*np.pi)*sigma*sfr)*/
 }
 
 double pdf_sfr_passive_lognormal(double mstar, double z, struct Params p, gsl_rng *rng){
@@ -338,11 +272,11 @@ double pdf_sfr_passive_lognormal(double mstar, double z, struct Params p, gsl_rn
     assert(p.sfr_pass_mshift >= 0.);
     
     // Draw log-normal realisation
-    gsl_ran_lognormal(rng,
+    return gsl_ran_lognormal(rng,
                       log( sfr_sfms(mstar, z, p) * p.sfr_pass_mshift ),
                       p.sfr_pass_sigma * log(10.)); // sigma in dex
-    //return np.exp(-0.5 * (np.log(sfr/mean_sfr) / sigma)**2.) \
-    //     / (np.sqrt(2.*np.pi)*sigma*sfr)
+    /*return np.exp(-0.5 * (np.log(sfr/mean_sfr) / sigma)**2.) \
+         / (np.sqrt(2.*np.pi)*sigma*sfr)*/
 }
 
 double tau_extinction(double sintheta, double mstar, char band, double z, 
@@ -412,7 +346,7 @@ void realise_catalogue(struct Catalogue *cat, struct Params p, gsl_rng *rng){
         }
         
         // Intrinsic optical magnitudes
-        
+        // ...
         
     } // end i loop over halos
     
@@ -423,12 +357,12 @@ void realise_catalogue(struct Catalogue *cat, struct Params p, gsl_rng *rng){
 ////////////////////////////////////////////////////////////////////////////////
 
 
-void main(int argc, const char* argv[]){
+int main(int argc, const char* argv[]){
     /*
      * 
      */
-    bool *passive;
-    double **catalogue;
+    //bool *passive;
+    //double **catalogue;
     struct Params p;
     struct Catalogue cat;
     gsl_rng *rng;
@@ -465,5 +399,5 @@ void main(int argc, const char* argv[]){
     // Free GSL RNG objects
     gsl_rng_free(rng);
     
-    return;
+    return 0;
 }

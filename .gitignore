@@ -5,3 +5,4 @@ src/*.so
 src/*.o
 src/build/
 src/build/*
+src/ghmock

@@ -87,14 +87,18 @@ void default_params(struct Params *p);
 
 // ghost model pdfs and supporting functions
 double mass_stellar_cen(double mhalo, double z, struct Params p);
-double pdf_mass_stellar_cen(double mhalo, double z, struct Params p, gsl_rng *rng);
+double draw_mass_stellar_cen(double mhalo, double z, struct Params p, gsl_rng *rng);
 double f_passive(double mstar, double z, struct Params p);
-bool pdf_galaxy_type(double mstar, double z, struct Params p, gsl_rng *rng);
+bool draw_galaxy_type(double mstar, double z, struct Params p, gsl_rng *rng);
 double sfr_sfms(double mstar, double z, struct Params p);
-double pdf_sfr_sfms(double mstar, double z, struct Params p, gsl_rng *rng);
-double pdf_sfr_passive_lognormal(double mstar, double z, struct Params p, gsl_rng *rng);
+double draw_sfr_sfms(double mstar, double z, struct Params p, gsl_rng *rng);
+double draw_sfr_passive_lognormal(double mstar, double z, struct Params p, gsl_rng *rng);
 double tau_extinction(double sintheta, double mstar, char band, double z, struct Params p);
 double optical_mag(double sfr, double mstar, char band, double z, struct Params p);
+double draw_optical_mag_intrinsic(double sfr, double mstar, char band, double z, 
+                                  struct Params p, gsl_rng *rng);
+double draw_optical_mag_atten(double mag_int, double mstar, char band, double z, 
+                              struct Params p, gsl_rng *rng);
 
 // Model realisation code
 void realise_catalogue(struct Catalogue *cat, struct Params p, gsl_rng *rng);

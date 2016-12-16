@@ -226,9 +226,10 @@ double f_passive(double mstar, double z, struct Params p){
     /*
     Fraction of passive galaxies at a given stellar mass and redshift.
     */
-    double c = 0.5 * (1. + tanh(p.fpass_zeta));
-    return c + (1. - c) 
-      / pow( 1. + (mstar / pow(10., p.fpass_alpha0 + p.fpass_alpha1*z)), p.fpass_beta);
+    double c, mscale;
+    c = 0.5 * (1. + tanh(p.fpass_zeta));
+    mscale = pow(10., p.fpass_alpha0 + p.fpass_alpha1*z);
+    return c + (1. - c) / ( 1. + pow(mstar / mscale, p.fpass_beta) );
 }
 
 bool draw_galaxy_type(double mstar, double z, struct Params p, gsl_rng *rng){
@@ -383,18 +384,18 @@ void realise_catalogue(struct Catalogue *cat, struct Params p, gsl_rng *rng){
     for(int i=0; i<cat->nhalos; i++){
         
         // Stellar mass
-        cat->mstar[i] = pdf_mass_stellar_cen(cat->mhalo[i], cat->z[i], p, rng);
+        cat->mstar[i] = draw_mass_stellar_cen(cat->mhalo[i], cat->z[i], p, rng);
         
         // Galaxy type
-        cat->passive[i] = pdf_galaxy_type(cat->mhalo[i], cat->z[i], p, rng);
+        cat->passive[i] = draw_galaxy_type(cat->mhalo[i], cat->z[i], p, rng);
         
         // SFR (depending on galaxy type)
-        if(cat->passive[i]){
+        if(cat->passive[i] == true){
             // Passive type
-            cat->sfr[i] = pdf_sfr_passive_lognormal(cat->mstar[i], cat->z[i], p, rng);
+            cat->sfr[i] = draw_sfr_passive_lognormal(cat->mstar[i], cat->z[i], p, rng);
         }else{
             // Star-forming type
-            cat->sfr[i] = pdf_sfr_sfms(cat->mstar[i], cat->z[i], p, rng);
+            cat->sfr[i] = draw_sfr_sfms(cat->mstar[i], cat->z[i], p, rng);
         }
         
         // Intrinsic optical magnitudes

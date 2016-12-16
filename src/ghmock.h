@@ -22,6 +22,10 @@ struct Catalogue{
     int nhalos;
 };
 
+// Define optical frequncy bands
+#define NUM_BANDS 5
+enum {BAND_U, BAND_G, BAND_R, BAND_I, BAND_Z};
+
 // Parameters of the model
 struct Params{
     
@@ -66,10 +70,12 @@ struct Params{
     double opt_mstar_amp;
     double opt_mstar_c;
     double opt_mstar_beta;
-    double opt_cross_amp[5];
+    double opt_cross_amp[NUM_BANDS];
     double opt_cross_beta;
     double opt_cross_gamma;
-    double opt_offset[5];
+    double opt_offset[NUM_BANDS];
+    double opt_pdf_sigma[NUM_BANDS]; 
+    double opt_pdf_mean[NUM_BANDS];
     
 };
 

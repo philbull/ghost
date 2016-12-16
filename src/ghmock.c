@@ -7,10 +7,8 @@
 
 #include "ghmock.h"
 
-// Define optical frequency bands
-const char BAND_NAMES[5] = "ugriz";
-const double BAND_WAVELENGTHS[5] = {3543., 4770., 6231., 7625., 9134.};
-const int BAND_NUM = 5;
+const char BAND_NAMES[NUM_BANDS] = "ugriz";
+const double BAND_WAVELENGTHS[NUM_BANDS] = {3543., 4770., 6231., 7625., 9134.};
 
 ////////////////////////////////////////////////////////////////////////////////
 // I/O utility functions
@@ -23,7 +21,7 @@ int band_index(char band){
     int idx = -1;
     
     // Find index of requested band
-    for(int i=0; i < BAND_NUM; i++){
+    for(int i=0; i < NUM_BANDS; i++){
         if(band == BAND_NAMES[i]){
             idx = i;
         }
@@ -148,16 +146,27 @@ void default_params(struct Params *p){
     p->opt_mstar_beta = -0.000242854097;
     p->opt_cross_beta = -0.262636097;
     p->opt_cross_gamma = 0.290177366;
-    p->opt_cross_amp[0] = -3.61194266;
-    p->opt_cross_amp[1] = -2.70027825;
-    p->opt_cross_amp[2] = -2.01635745;
-    p->opt_cross_amp[3] = -1.72575487;
-    p->opt_cross_amp[4] = -1.56393268;
-    p->opt_offset[0] = -27.3176081;
-    p->opt_offset[1] = -25.9445857;
-    p->opt_offset[2] = -25.2836569;
-    p->opt_offset[3] = -24.981922;
-    p->opt_offset[4] = -24.8096689;
+    p->opt_cross_amp[BAND_U] = -3.61194266;
+    p->opt_cross_amp[BAND_G] = -2.70027825;
+    p->opt_cross_amp[BAND_R] = -2.01635745;
+    p->opt_cross_amp[BAND_I] = -1.72575487;
+    p->opt_cross_amp[BAND_Z] = -1.56393268;
+    p->opt_offset[BAND_U] = -27.3176081;
+    p->opt_offset[BAND_G] = -25.9445857;
+    p->opt_offset[BAND_R] = -25.2836569;
+    p->opt_offset[BAND_I] = -24.981922;
+    p->opt_offset[BAND_Z] = -24.8096689;
+    p->opt_pdf_sigma[BAND_U] = 0.28122634653850337;
+    p->opt_pdf_sigma[BAND_G] = 0.25232918833346546;
+    p->opt_pdf_sigma[BAND_R] = 0.2468073941298409;
+    p->opt_pdf_sigma[BAND_I] = 0.25273681573440887;
+    p->opt_pdf_sigma[BAND_Z] = 0.2724513351999828;
+    p->opt_pdf_mean[BAND_U] = -0.06587481168919591;
+    p->opt_pdf_mean[BAND_G] = -0.053777765775930214;
+    p->opt_pdf_mean[BAND_R] = -0.01854712885192855;
+    p->opt_pdf_mean[BAND_I] = -0.008538656095465969;
+    p->opt_pdf_mean[BAND_Z] = -0.008732300503716532;
+    
 }
 
 
@@ -184,7 +193,7 @@ double mass_stellar_cen(double mhalo, double z, struct Params p){
 }
 
 
-double pdf_mass_stellar_cen(double mhalo, double z, struct Params p, gsl_rng *rng){
+double draw_mass_stellar_cen(double mhalo, double z, struct Params p, gsl_rng *rng){
     /*
     Prob. density function for stellar mass, given halo mass and redshift. Uses 
     the form from Moster et al. (2010). Central galaxies.
@@ -207,7 +216,7 @@ double pdf_mass_stellar_cen(double mhalo, double z, struct Params p, gsl_rng *rn
     // Return pdf
     return gsl_ran_lognormal(rng, 
                              log(mean_ms),
-                             sigma); // FIXME: wrong args?!
+                             sigma);
     /*return exp(-log(mstar/mean_ms)**2./(2.*sigma**2.)) \
          / (np.sqrt(2.*np.pi)*sigma*Ms); */
 }
@@ -222,7 +231,7 @@ double f_passive(double mstar, double z, struct Params p){
       / pow( 1. + (mstar / pow(10., p.fpass_alpha0 + p.fpass_alpha1*z)), p.fpass_beta);
 }
 
-bool pdf_galaxy_type(double mstar, double z, struct Params p, gsl_rng *rng){
+bool draw_galaxy_type(double mstar, double z, struct Params p, gsl_rng *rng){
     /*
     Draw galaxy type (passive vs. star-forming).
     */
@@ -249,19 +258,19 @@ double sfr_sfms(double mstar, double z, struct Params p){
 /////////////////////////////// FIXME: passive sequence
 
 
-double pdf_sfr_sfms(double mstar, double z, struct Params p, gsl_rng *rng){
+double draw_sfr_sfms(double mstar, double z, struct Params p, gsl_rng *rng){
     /*
     Prob. density function for SFR on the SF main sequence, given stellar mass 
     and redshift, p(SFR | M_*, z).
     */
     return gsl_ran_lognormal(rng,
                              log( sfr_sfms(mstar, z, p) ), 
-                             p.sfr_sfms_sigma * log(10.)); // FIXME: wrong args?
+                             p.sfr_sfms_sigma * log(10.));
     /*return np.exp(-np.log(sfr/mean_sfr)**2./(2.*sigma**2.)) \
          / (np.sqrt(2.*np.pi)*sigma*sfr)*/
 }
 
-double pdf_sfr_passive_lognormal(double mstar, double z, struct Params p, gsl_rng *rng){
+double draw_sfr_passive_lognormal(double mstar, double z, struct Params p, gsl_rng *rng){
     /*
     Prob. density function for SFR on the SF main sequence, given stellar mass 
     and redshift, p(SFR | M_*, z). [log-normal version]
@@ -273,8 +282,8 @@ double pdf_sfr_passive_lognormal(double mstar, double z, struct Params p, gsl_rn
     
     // Draw log-normal realisation
     return gsl_ran_lognormal(rng,
-                      log( sfr_sfms(mstar, z, p) * p.sfr_pass_mshift ),
-                      p.sfr_pass_sigma * log(10.)); // sigma in dex
+                             log( sfr_sfms(mstar, z, p) * p.sfr_pass_mshift ),
+                             p.sfr_pass_sigma * log(10.)); // sigma in dex
     /*return np.exp(-0.5 * (np.log(sfr/mean_sfr) / sigma)**2.) \
          / (np.sqrt(2.*np.pi)*sigma*sfr)*/
 }
@@ -315,6 +324,49 @@ double optical_mag(double sfr, double mstar, char band, double z, struct Params 
                              * pow(sfr, p.opt_cross_gamma) 
         - p.opt_offset[i];
     return mag;
+}
+
+double draw_optical_mag_intrinsic(double sfr, double mstar, char band, double z, 
+                                  struct Params p, gsl_rng *rng)
+{
+    /*
+    Intrinsic optical magnitude pdf, conditioned on Mstar and SFR: 
+        p(mag_X | M_*, SFR, z). 
+    Assumed to be lognormal, with scatter measured from Guo et al. simulations.
+    */
+    int i;
+    double mu, mean, sigma, u;
+    
+    // Figure out which band to use
+    i = band_index(band);
+    
+    // Central value (mu), and mean and standard deviation of residual
+    mu = optical_mag(sfr, mstar, band, z, p);
+    mean = p.opt_pdf_mean[i];
+    sigma = p.opt_pdf_sigma[i];
+    
+    // Draw realisation of u, the shifted log-normal variate
+    u = gsl_ran_lognormal(rng, mean, sigma);
+    
+    // Return magnitude (transformed back from shifted variate, u)
+    return mu + exp( mean + 0.5 * sigma*sigma ) - u;
+}
+
+double draw_optical_mag_atten(double mag_int, double mstar, char band, double z, 
+                              struct Params p, gsl_rng *rng)
+{
+    /*
+    Dust-attenuated optical magnitude pdf, conditioned on the intrinsic mag.: 
+        p(mag_obs | mag_int). 
+    */
+    double dm0, dmpi2;
+    
+    // Terms in analytically-marginalised pdf
+    dm0 = 1.086 * tau_extinction(0., mstar, band, z, p); // theta=0
+    dmpi2 = 1.086 * tau_extinction(0.5*M_PI, mstar, band, z, p); // th=pi/2
+    
+    // Return uniform pdf, between mag_int + [Delta m(0), Delta m(pi/2)]
+    return mag_int + gsl_ran_flat(rng, dm0, dmpi2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

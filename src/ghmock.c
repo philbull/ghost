@@ -7,9 +7,6 @@
 
 #include "ghmock.h"
 
-const char BAND_NAMES[NUM_BANDS] = "ugriz";
-const double BAND_WAVELENGTHS[NUM_BANDS] = {3543., 4770., 6231., 7625., 9134.};
-
 ////////////////////////////////////////////////////////////////////////////////
 // I/O utility functions
 ////////////////////////////////////////////////////////////////////////////////
@@ -363,8 +360,26 @@ double draw_optical_mag_atten(double mag_int, double mstar, char band, double z,
     double dm0, dmpi2;
     
     // Terms in analytically-marginalised pdf
-    dm0 = 1.086 * tau_extinction(0., mstar, band, z, p); // theta=0
-    dmpi2 = 1.086 * tau_extinction(0.5*M_PI, mstar, band, z, p); // th=pi/2
+    //dm0 = 1.086 * tau_extinction(0., mstar, band, z, p); // theta=0
+    //dmpi2 = 1.086 * tau_extinction(0.5*M_PI, mstar, band, z, p); // th=pi/2
+    
+    // FIXME: Testing in-line version
+    double tau0 = p.extinction_tau0;
+    double beta = p.extinction_beta;
+    double adisk = p.extinction_diskfac;
+    double kappa = p.extinction_kappa;
+    double lambda0 = p.extinction_lambda0;
+    
+    double l = BAND_WAVELENGTHS[band_index(band)];
+    
+    
+    
+    dm0 = 1.086 * tau0 * pow(mstar / 1e11, beta)
+                * exp(-kappa * (l - lambda0)); // # theta=0
+    dmpi2 = dm0 * (1. + adisk);
+    
+    
+    printf("dm0 = %4.4e, dmpi2 = %4.4e, mstar = %4.4e\n", dm0, dmpi2, mstar);
     
     // Return uniform pdf, between mag_int + [Delta m(0), Delta m(pi/2)]
     return mag_int + gsl_ran_flat(rng, dm0, dmpi2);
@@ -374,9 +389,9 @@ double draw_optical_mag_atten(double mag_int, double mstar, char band, double z,
 // Model realisation code
 ////////////////////////////////////////////////////////////////////////////////
 
-void realise_catalogue(struct Catalogue *cat, struct Params p, gsl_rng *rng){
+void realise_physical_properties(struct Catalogue *cat, struct Params p, gsl_rng *rng){
     /*
-    Populate a mock galaxy catalogue by drawing values for all parameters.
+    Populate a halo catalogue with galaxy physical properties.
     */
     
     // Loop over halos; populate with galaxy prooperties by traversing model
@@ -398,12 +413,10 @@ void realise_catalogue(struct Catalogue *cat, struct Params p, gsl_rng *rng){
             cat->sfr[i] = draw_sfr_sfms(cat->mstar[i], cat->z[i], p, rng);
         }
         
-        // Intrinsic optical magnitudes
-        // ...
-        
     } // end i loop over halos
     
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Main function
@@ -437,7 +450,7 @@ int main(int argc, const char* argv[]){
     cat.passive = (bool*)malloc(sizeof(bool) * (cat.nhalos));
     
     // Realise all variables in catalogue
-    realise_catalogue(&cat, p, rng);
+    realise_physical_properties(&cat, p, rng);
     
     // Output catalogue to file
     save_catalogue("mock.dat", &cat);

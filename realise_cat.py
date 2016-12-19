@@ -9,8 +9,8 @@ import sys
 sys.path.append('src/')
 import ghost
 
-MHALO_MIN = 1e11 # Min. halo mass
-NHALO = 3e4 # Number of halos to generate
+MHALO_MIN = 1e13 # Min. halo mass
+NHALO = 100 # Number of halos to generate
 
 np.random.seed(10)
 
@@ -44,14 +44,28 @@ for i in range(mhbin.size - 1):
     mhalo += [np.exp(logmh)]
 mhalo = np.concatenate(mhalo)
 
+params = {} #{'ms_cen_beta': 0.5}
 
-mstar, sfr, passive = ghost.realise(mhalo, np.zeros(mhalo.size), {})
+
+z = np.zeros(mhalo.size)
+mstar, sfr, passive = ghost.add_physical_properties(mhalo, z, params)
+
+mag_int, mag_obs = ghost.add_optical_mags(mstar, sfr, z, 'u', params, atten=True)
+
+P.plot(mag_int, mag_obs, 'r,')
+P.xlim((-22., -4.))
+P.ylim((-22., -4.))
+P.show()
+
+exit()
+#help(ghost.add_optical_mags)
 
 print np.where(passive == True)[0].size, np.where(passive == False)[0].size
 
 P.plot(mstar, sfr, 'r,')
 P.xscale('log')
 P.yscale('log')
+
 P.show()
 
 #P.hist(np.log10(sfr), bins=50)

@@ -8,7 +8,7 @@ setup(
     ext_modules = [ 
                 Extension(
                           "ghost",
-                          ["pyghost.c", "ghmock.c"],
+                          ["band_spec.c", "pyghost.c", "ghmock.c"],
                           libraries = ['m', 'gsl', 'gslcblas', 'gomp'],
                           depends = ['ghmock.h'],
                           extra_compile_args=['-O4', '-fopenmp',]

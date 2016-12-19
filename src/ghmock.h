@@ -25,6 +25,10 @@ struct Catalogue{
 // Define optical frequncy bands
 #define NUM_BANDS 5
 enum {BAND_U, BAND_G, BAND_R, BAND_I, BAND_Z};
+extern const double BAND_WAVELENGTHS[NUM_BANDS];
+extern const char BAND_NAMES[NUM_BANDS];
+
+//const char WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW;
 
 // Parameters of the model
 struct Params{
@@ -101,7 +105,7 @@ double draw_optical_mag_atten(double mag_int, double mstar, char band, double z,
                               struct Params p, gsl_rng *rng);
 
 // Model realisation code
-void realise_catalogue(struct Catalogue *cat, struct Params p, gsl_rng *rng);
+void realise_physical_properties(struct Catalogue *cat, struct Params p, gsl_rng *rng);
 
 // Main function
 int main(int argc, const char* argv[]);

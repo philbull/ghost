@@ -1,6 +1,7 @@
 *.pyc
 *.pdf
 *.npy
+*.dat
 src/*.so
 src/*.o
 src/build/

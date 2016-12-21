@@ -52,8 +52,8 @@ void load_halos_from_file(char* fname, struct Catalogue *cat){
     rewind(f); // Return to start of file
     
     // Allocate halo arrays
-    cat->mhalo = malloc(sizeof(double) * (cat->nhalos));
-    cat->z = malloc(sizeof(double) * (cat->nhalos));
+    cat->mhalo = malloc(sizeof(float) * (cat->nhalos));
+    cat->z = malloc(sizeof(float) * (cat->nhalos));
     
     // Load catalogue into arrays (assumes only two columns, space-separated)
     for(int i=0; i < cat->nhalos; i++){
@@ -171,13 +171,13 @@ void default_params(struct Params *p){
 // ghost model pdfs and supporting functions
 ////////////////////////////////////////////////////////////////////////////////
 
-double mass_stellar_cen(double mhalo, double z, struct Params p){
+float mass_stellar_cen(float mhalo, float z, struct Params p){
     /*
     Fitting function for the central galaxy stellar mass of a given halo, 
     using Eq.2 of Moster, B. P. et al. 2010, ApJ, 710, 903.
     [Mvir should be in Msun]
     */
-    double logM1, M1, norm, beta, gamma;
+    float logM1, M1, norm, beta, gamma;
     
     // Redshift-dependent functions (Eqs. 23-26 of Moster et al.)
     logM1 = p.ms_cen_logM1 * pow(1. + z, p.ms_cen_mu);
@@ -190,12 +190,12 @@ double mass_stellar_cen(double mhalo, double z, struct Params p){
 }
 
 
-double draw_mass_stellar_cen(double mhalo, double z, struct Params p, gsl_rng *rng){
+float draw_mass_stellar_cen(float mhalo, float z, struct Params p, gsl_rng *rng){
     /*
     Prob. density function for stellar mass, given halo mass and redshift. Uses 
     the form from Moster et al. (2010). Central galaxies.
     */
-    double M2, mean_ms, sigma;
+    float M2, mean_ms, sigma;
     
     // Mean stellar mass as fn. of halo mass
     mean_ms = mass_stellar_cen(mhalo, z, p);
@@ -219,21 +219,21 @@ double draw_mass_stellar_cen(double mhalo, double z, struct Params p, gsl_rng *r
 }
 
 
-double f_passive(double mstar, double z, struct Params p){
+float f_passive(float mstar, float z, struct Params p){
     /*
     Fraction of passive galaxies at a given stellar mass and redshift.
     */
-    double c, mscale;
+    float c, mscale;
     c = 0.5 * (1. + tanh(p.fpass_zeta));
     mscale = pow(10., p.fpass_alpha0 + p.fpass_alpha1*z);
     return c + (1. - c) / ( 1. + pow(mstar / mscale, p.fpass_beta) );
 }
 
-bool draw_galaxy_type(double mstar, double z, struct Params p, gsl_rng *rng){
+bool draw_galaxy_type(float mstar, float z, struct Params p, gsl_rng *rng){
     /*
     Draw galaxy type (passive vs. star-forming).
     */
-    double fpass = f_passive(mstar, z, p);
+    float fpass = f_passive(mstar, z, p);
     
     // Draw uniform random number and apply passive cut
     if(gsl_rng_uniform(rng) > fpass){
@@ -244,7 +244,7 @@ bool draw_galaxy_type(double mstar, double z, struct Params p, gsl_rng *rng){
 }
 
 
-double sfr_sfms(double mstar, double z, struct Params p){
+float sfr_sfms(float mstar, float z, struct Params p){
     /*
     Mean SFR of the star-formation main sequence.
     */
@@ -256,7 +256,7 @@ double sfr_sfms(double mstar, double z, struct Params p){
 /////////////////////////////// FIXME: passive sequence
 
 
-double draw_sfr_sfms(double mstar, double z, struct Params p, gsl_rng *rng){
+float draw_sfr_sfms(float mstar, float z, struct Params p, gsl_rng *rng){
     /*
     Prob. density function for SFR on the SF main sequence, given stellar mass 
     and redshift, p(SFR | M_*, z).
@@ -268,7 +268,7 @@ double draw_sfr_sfms(double mstar, double z, struct Params p, gsl_rng *rng){
          / (np.sqrt(2.*np.pi)*sigma*sfr)*/
 }
 
-double draw_sfr_passive_lognormal(double mstar, double z, struct Params p, gsl_rng *rng){
+float draw_sfr_passive_lognormal(float mstar, float z, struct Params p, gsl_rng *rng){
     /*
     Prob. density function for SFR on the SF main sequence, given stellar mass 
     and redshift, p(SFR | M_*, z). [log-normal version]
@@ -286,12 +286,12 @@ double draw_sfr_passive_lognormal(double mstar, double z, struct Params p, gsl_r
          / (np.sqrt(2.*np.pi)*sigma*sfr)*/
 }
 
-double tau_extinction(double sintheta, double mstar, char band, double z, 
+float tau_extinction(float sintheta, float mstar, char band, float z, 
                      struct Params p){
     /*
     Dust extinction optical depth as a function of inclination angle.
     */
-    double l;
+    float l;
     
     // Get band wavelength
     l = BAND_WAVELENGTHS[band_index(band)];
@@ -302,14 +302,14 @@ double tau_extinction(double sintheta, double mstar, char band, double z,
             * exp(-p.extinction_kappa * (l - p.extinction_lambda0));
 }
 
-double optical_mag(double sfr, double mstar, char band, double z, struct Params p){
+float optical_mag(float sfr, float mstar, char band, float z, struct Params p){
     /*
     Return the predicted optical magnitude given the stellar mass and SFR. 
     Calculated using an ansatz with best-fit parameters calibrated against 
     the Guo et al. catalogue.
     */
     int i;
-    double mag;
+    float mag;
     
     // Figure out which band to use
     i = band_index(band);
@@ -324,7 +324,7 @@ double optical_mag(double sfr, double mstar, char band, double z, struct Params 
     return mag;
 }
 
-double draw_optical_mag_intrinsic(double sfr, double mstar, char band, double z, 
+float draw_optical_mag_intrinsic(float sfr, float mstar, char band, float z, 
                                   struct Params p, gsl_rng *rng)
 {
     /*
@@ -333,7 +333,7 @@ double draw_optical_mag_intrinsic(double sfr, double mstar, char band, double z,
     Assumed to be lognormal, with scatter measured from Guo et al. simulations.
     */
     int i;
-    double mu, mean, sigma, u;
+    float mu, mean, sigma, u;
     
     // Figure out which band to use
     i = band_index(band);
@@ -350,36 +350,18 @@ double draw_optical_mag_intrinsic(double sfr, double mstar, char band, double z,
     return mu + exp( mean + 0.5 * sigma*sigma ) - u;
 }
 
-double draw_optical_mag_atten(double mag_int, double mstar, char band, double z, 
+float draw_optical_mag_atten(float mag_int, float mstar, char band, float z, 
                               struct Params p, gsl_rng *rng)
 {
     /*
     Dust-attenuated optical magnitude pdf, conditioned on the intrinsic mag.: 
         p(mag_obs | mag_int). 
     */
-    double dm0, dmpi2;
+    float dm0, dmpi2;
     
     // Terms in analytically-marginalised pdf
-    //dm0 = 1.086 * tau_extinction(0., mstar, band, z, p); // theta=0
-    //dmpi2 = 1.086 * tau_extinction(0.5*M_PI, mstar, band, z, p); // th=pi/2
-    
-    // FIXME: Testing in-line version
-    double tau0 = p.extinction_tau0;
-    double beta = p.extinction_beta;
-    double adisk = p.extinction_diskfac;
-    double kappa = p.extinction_kappa;
-    double lambda0 = p.extinction_lambda0;
-    
-    double l = BAND_WAVELENGTHS[band_index(band)];
-    
-    
-    
-    dm0 = 1.086 * tau0 * pow(mstar / 1e11, beta)
-                * exp(-kappa * (l - lambda0)); // # theta=0
-    dmpi2 = dm0 * (1. + adisk);
-    
-    
-    printf("dm0 = %4.4e, dmpi2 = %4.4e, mstar = %4.4e\n", dm0, dmpi2, mstar);
+    dm0 = 1.086 * tau_extinction(0., mstar, band, z, p); // theta=0
+    dmpi2 = 1.086 * tau_extinction(0.5*M_PI, mstar, band, z, p); // th=pi/2
     
     // Return uniform pdf, between mag_int + [Delta m(0), Delta m(pi/2)]
     return mag_int + gsl_ran_flat(rng, dm0, dmpi2);
@@ -428,7 +410,7 @@ int main(int argc, const char* argv[]){
      * 
      */
     //bool *passive;
-    //double **catalogue;
+    //float **catalogue;
     struct Params p;
     struct Catalogue cat;
     gsl_rng *rng;
@@ -445,8 +427,8 @@ int main(int argc, const char* argv[]){
     load_halos_from_file("test.dat", &cat);
     
     // Allocate arrays for catalogue variables
-    cat.mstar = (double*)malloc(sizeof(double) * (cat.nhalos));
-    cat.sfr = (double*)malloc(sizeof(double) * (cat.nhalos));
+    cat.mstar = (float*)malloc(sizeof(float) * (cat.nhalos));
+    cat.sfr = (float*)malloc(sizeof(float) * (cat.nhalos));
     cat.passive = (bool*)malloc(sizeof(bool) * (cat.nhalos));
     
     // Realise all variables in catalogue

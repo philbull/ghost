@@ -10,14 +10,14 @@
 
 // Define optical frequency bands
 //const char BAND_NAMES[5] = "ugriz";
-//const double BAND_WAVELENGTHS[5] = {3543., 4770., 6231., 7625., 9134.};
+//const float BAND_WAVELENGTHS[5] = {3543., 4770., 6231., 7625., 9134.};
 //const int BAND_NUM = 5;
 
 struct Catalogue{
-    double *mhalo;
-    double *z;
-    double *mstar;
-    double *sfr;
+    float *mhalo;
+    float *z;
+    float *mstar;
+    float *sfr;
     bool *passive;
     int nhalos;
 };
@@ -25,61 +25,59 @@ struct Catalogue{
 // Define optical frequncy bands
 #define NUM_BANDS 5
 enum {BAND_U, BAND_G, BAND_R, BAND_I, BAND_Z};
-extern const double BAND_WAVELENGTHS[NUM_BANDS];
+extern const float BAND_WAVELENGTHS[NUM_BANDS];
 extern const char BAND_NAMES[NUM_BANDS];
-
-//const char WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW;
 
 // Parameters of the model
 struct Params{
     
     // Stellar mass-halo mass relation for centrals
-    double ms_cen_logM1;
-    double ms_cen_norm;
-    double ms_cen_mu;
-    double ms_cen_nu;
-    double ms_cen_beta0;
-    double ms_cen_beta1;
-    double ms_cen_gamma0;
-    double ms_cen_gamma1;
-    double ms_cen_logM2;
-    double ms_cen_sigmainf;
-    double ms_cen_sigma1;
-    double ms_cen_xi;
+    float ms_cen_logM1;
+    float ms_cen_norm;
+    float ms_cen_mu;
+    float ms_cen_nu;
+    float ms_cen_beta0;
+    float ms_cen_beta1;
+    float ms_cen_gamma0;
+    float ms_cen_gamma1;
+    float ms_cen_logM2;
+    float ms_cen_sigmainf;
+    float ms_cen_sigma1;
+    float ms_cen_xi;
     
     // Passive fraction parameters
-    double fpass_alpha0;
-    double fpass_alpha1;
-    double fpass_beta;
-    double fpass_zeta;
+    float fpass_alpha0;
+    float fpass_alpha1;
+    float fpass_beta;
+    float fpass_zeta;
     
     // SFMS parameters
-    double sfr_sfms_alpha0;
-    double sfr_sfms_alpha1;
-    double sfr_sfms_beta;
-    double sfr_sfms_sigma;
+    float sfr_sfms_alpha0;
+    float sfr_sfms_alpha1;
+    float sfr_sfms_beta;
+    float sfr_sfms_sigma;
     
     // Passive sequence parameters
-    double sfr_pass_mshift;
-    double sfr_pass_sigma;
+    float sfr_pass_mshift;
+    float sfr_pass_sigma;
     
     // Optical extinction parameters
-    double extinction_tau0;
-    double extinction_beta;
-    double extinction_diskfac;
-    double extinction_kappa;
-    double extinction_lambda0;
+    float extinction_tau0;
+    float extinction_beta;
+    float extinction_diskfac;
+    float extinction_kappa;
+    float extinction_lambda0;
     
     // Optical parameters
-    double opt_mstar_amp;
-    double opt_mstar_c;
-    double opt_mstar_beta;
-    double opt_cross_amp[NUM_BANDS];
-    double opt_cross_beta;
-    double opt_cross_gamma;
-    double opt_offset[NUM_BANDS];
-    double opt_pdf_sigma[NUM_BANDS]; 
-    double opt_pdf_mean[NUM_BANDS];
+    float opt_mstar_amp;
+    float opt_mstar_c;
+    float opt_mstar_beta;
+    float opt_cross_amp[NUM_BANDS];
+    float opt_cross_beta;
+    float opt_cross_gamma;
+    float opt_offset[NUM_BANDS];
+    float opt_pdf_sigma[NUM_BANDS]; 
+    float opt_pdf_mean[NUM_BANDS];
     
 };
 
@@ -90,18 +88,18 @@ void save_catalogue(char* fname, struct Catalogue *cat);
 void default_params(struct Params *p);
 
 // ghost model pdfs and supporting functions
-double mass_stellar_cen(double mhalo, double z, struct Params p);
-double draw_mass_stellar_cen(double mhalo, double z, struct Params p, gsl_rng *rng);
-double f_passive(double mstar, double z, struct Params p);
-bool draw_galaxy_type(double mstar, double z, struct Params p, gsl_rng *rng);
-double sfr_sfms(double mstar, double z, struct Params p);
-double draw_sfr_sfms(double mstar, double z, struct Params p, gsl_rng *rng);
-double draw_sfr_passive_lognormal(double mstar, double z, struct Params p, gsl_rng *rng);
-double tau_extinction(double sintheta, double mstar, char band, double z, struct Params p);
-double optical_mag(double sfr, double mstar, char band, double z, struct Params p);
-double draw_optical_mag_intrinsic(double sfr, double mstar, char band, double z, 
+float mass_stellar_cen(float mhalo, float z, struct Params p);
+float draw_mass_stellar_cen(float mhalo, float z, struct Params p, gsl_rng *rng);
+float f_passive(float mstar, float z, struct Params p);
+bool draw_galaxy_type(float mstar, float z, struct Params p, gsl_rng *rng);
+float sfr_sfms(float mstar, float z, struct Params p);
+float draw_sfr_sfms(float mstar, float z, struct Params p, gsl_rng *rng);
+float draw_sfr_passive_lognormal(float mstar, float z, struct Params p, gsl_rng *rng);
+float tau_extinction(float sintheta, float mstar, char band, float z, struct Params p);
+float optical_mag(float sfr, float mstar, char band, float z, struct Params p);
+float draw_optical_mag_intrinsic(float sfr, float mstar, char band, float z, 
                                   struct Params p, gsl_rng *rng);
-double draw_optical_mag_atten(double mag_int, double mstar, char band, double z, 
+float draw_optical_mag_atten(float mag_int, float mstar, char band, float z, 
                               struct Params p, gsl_rng *rng);
 
 // Model realisation code

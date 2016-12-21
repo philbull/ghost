@@ -77,7 +77,7 @@ static char docstring_add_physical_properties[] =
   "catalogue.\n\n"
   "Parameters\n"
   "----------\n"
-  "mhalo, z : array_like\n"
+  "mhalo, z : array_like (must have dtype==np.float32)\n"
   "  Arrays containing the halo mass [M_sun] and redshift of the objects in \n"
   "  the halo catalogue.\n\n"
   "params : dict (optional)\n"
@@ -123,15 +123,32 @@ static PyObject* add_physical_properties(PyObject *self, PyObject *args){
     struct Catalogue cat;
     
     // Convert input arguments to numpy arrays and expose C pointers to data
-    PyObject *np_mhalo = PyArray_FROM_OTF(arg_mhalo, NPY_DOUBLE, NPY_ARRAY_IN_ARRAY);
-    PyObject *np_z = PyArray_FROM_OTF(arg_z, NPY_DOUBLE, NPY_ARRAY_IN_ARRAY);
+    PyArrayObject *np_mhalo = (PyArrayObject*)PyArray_FROM_O(arg_mhalo);
+    PyArrayObject *np_z = (PyArrayObject*)PyArray_FROM_O(arg_z);
+    
+    // Test input data type; must be NPY_FLOAT32
+    PyArray_Descr *dtype_mhalo = PyArray_DTYPE(np_mhalo);
+    PyArray_Descr *dtype_z = PyArray_DTYPE(np_z);
+    
+    if (dtype_mhalo->type_num != NPY_FLOAT32){
+        PyErr_SetString( PyExc_RuntimeError, 
+                         "Data type of input 'mhalo' not allowed. "
+                         "Must be np.float32.");
+        return NULL;
+    }
+    if (dtype_z->type_num != NPY_FLOAT32){
+        PyErr_SetString( PyExc_RuntimeError, 
+                         "Data type of input 'z' not allowed. "
+                         "Must be np.float32.");
+        return NULL;
+    }
     int N = (int)PyArray_DIM(np_mhalo, 0); // Get length of input arrays
     
     // Create new ndarrays and provide data access pointers for C code
     int ndim = 1;
     npy_intp shape[1] = {N};
-    PyObject *np_mstar = PyArray_SimpleNew(ndim, shape, NPY_DOUBLE);
-    PyObject *np_sfr = PyArray_SimpleNew(ndim, shape, NPY_DOUBLE);
+    PyObject *np_mstar = PyArray_SimpleNew(ndim, shape, NPY_FLOAT);
+    PyObject *np_sfr = PyArray_SimpleNew(ndim, shape, NPY_FLOAT);
     PyObject *np_passive = PyArray_SimpleNew(ndim, shape, NPY_BOOL);
     if ((np_mstar == NULL) || (np_sfr == NULL) || (np_passive == NULL)) {
         PyErr_SetString(PyExc_RuntimeError, "Building output arrays failed.");
@@ -143,10 +160,10 @@ static PyObject* add_physical_properties(PyObject *self, PyObject *args){
     
     // Get references to data structures for galaxy properties
     cat.nhalos = N;
-    cat.mhalo = (double*)PyArray_DATA(np_mhalo);
-    cat.z = (double*)PyArray_DATA(np_z);
-    cat.mstar = (double*)PyArray_DATA(np_mstar); // uninitialised
-    cat.sfr = (double*)PyArray_DATA(np_sfr); // uninitialised
+    cat.mhalo = (float*)PyArray_DATA(np_mhalo);
+    cat.z = (float*)PyArray_DATA(np_z);
+    cat.mstar = (float*)PyArray_DATA(np_mstar); // uninitialised
+    cat.sfr = (float*)PyArray_DATA(np_sfr); // uninitialised
     cat.passive = (bool*)PyArray_DATA(np_passive); // uninitialised
     
     // Traverse ghost model to add physical properties
@@ -156,6 +173,8 @@ static PyObject* add_physical_properties(PyObject *self, PyObject *args){
     Py_DECREF(np_mhalo);
     Py_DECREF(np_z);
     Py_DECREF(arg_params);
+    Py_DECREF(dtype_mhalo);
+    Py_DECREF(dtype_z);
     gsl_rng_free(rng);
     
     // Construct tuple of arrays to be returned
@@ -224,15 +243,39 @@ static PyObject* add_optical_mags(PyObject *self, PyObject *args, PyObject *kwar
     set_params(arg_params, &p);
     
     // Convert input arguments to numpy arrays
-    PyObject *np_mstar = PyArray_FROM_OTF(arg_mstar, NPY_DOUBLE, NPY_ARRAY_IN_ARRAY);
-    PyObject *np_sfr = PyArray_FROM_OTF(arg_sfr, NPY_DOUBLE, NPY_ARRAY_IN_ARRAY);
-    PyObject *np_z = PyArray_FROM_OTF(arg_z, NPY_DOUBLE, NPY_ARRAY_IN_ARRAY);
+    PyArrayObject *np_mstar = (PyArrayObject*)PyArray_FROM_O(arg_mstar);
+    PyArrayObject *np_sfr = (PyArrayObject*)PyArray_FROM_O(arg_sfr);
+    PyArrayObject *np_z = (PyArrayObject*)PyArray_FROM_O(arg_z);
+    
+    // Test input data type; must be NPY_FLOAT32
+    PyArray_Descr *dtype_mstar = PyArray_DTYPE(np_mstar);
+    PyArray_Descr *dtype_sfr = PyArray_DTYPE(np_sfr);
+    PyArray_Descr *dtype_z = PyArray_DTYPE(np_z);
+    
+    if (dtype_mstar->type_num != NPY_FLOAT32){
+        PyErr_SetString( PyExc_RuntimeError, 
+                         "Data type of input 'mstar' not allowed. "
+                         "Must be np.float32.");
+        return NULL;
+    }
+    if (dtype_sfr->type_num != NPY_FLOAT32){
+        PyErr_SetString( PyExc_RuntimeError, 
+                         "Data type of input 'sfr' not allowed. "
+                         "Must be np.float32.");
+        return NULL;
+    }
+    if (dtype_z->type_num != NPY_FLOAT32){
+        PyErr_SetString( PyExc_RuntimeError, 
+                         "Data type of input 'z' not allowed. "
+                         "Must be np.float32.");
+        return NULL;
+    }
     int nhalos = (int)PyArray_DIM(np_mstar, 0); // Get length of input arrays
     
     // Create new intrinsic opt. mag. ndarray and provide data access pointer
     int ndim = 1;
     npy_intp shape[1] = {nhalos};
-    PyObject *np_mag_int = PyArray_SimpleNew(ndim, shape, NPY_DOUBLE);
+    PyObject *np_mag_int = PyArray_SimpleNew(ndim, shape, NPY_FLOAT);
     if (np_mag_int == NULL){
         PyErr_SetString(PyExc_RuntimeError, "Building output arrays failed.");
         Py_XDECREF(np_mag_int);
@@ -242,7 +285,7 @@ static PyObject* add_optical_mags(PyObject *self, PyObject *args, PyObject *kwar
     // Also setup ndarray for dust-attenuated magnitudes, if requested
     PyObject *np_mag_atten = Py_None;
     if (atten){
-        np_mag_atten = PyArray_SimpleNew(ndim, shape, NPY_DOUBLE);
+        np_mag_atten = PyArray_SimpleNew(ndim, shape, NPY_FLOAT);
         if (np_mag_atten == NULL){
             PyErr_SetString(PyExc_RuntimeError, "Building output arrays failed.");
             Py_XDECREF(np_mag_atten);
@@ -251,13 +294,13 @@ static PyObject* add_optical_mags(PyObject *self, PyObject *args, PyObject *kwar
     }
     
     // Get references to data structures for galaxy properties
-    double *mstar = (double*)PyArray_DATA(np_mstar);
-    double *sfr = (double*)PyArray_DATA(np_sfr);
-    double *z = (double*)PyArray_DATA(np_z);
-    double *mag_int = (double*)PyArray_DATA(np_mag_int); // uninitialised
-    double *mag_atten;
+    float *mstar = (float*)PyArray_DATA(np_mstar);
+    float *sfr = (float*)PyArray_DATA(np_sfr);
+    float *z = (float*)PyArray_DATA(np_z);
+    float *mag_int = (float*)PyArray_DATA(np_mag_int); // uninitialised
+    float *mag_atten;
     if (atten){
-      mag_atten = (double*)PyArray_DATA(np_mag_atten); // uninitialised
+      mag_atten = (float*)PyArray_DATA(np_mag_atten); // uninitialised
     }
     // Draw intrinsic optical magnitudes
     #pragma omp parallel for
@@ -280,6 +323,9 @@ static PyObject* add_optical_mags(PyObject *self, PyObject *args, PyObject *kwar
     Py_DECREF(np_sfr);
     Py_DECREF(np_z);
     Py_DECREF(arg_params);
+    Py_DECREF(dtype_mstar);
+    Py_DECREF(dtype_sfr);
+    Py_DECREF(dtype_z);
     gsl_rng_free(rng);
     
     // Construct tuple of arrays to be returned
